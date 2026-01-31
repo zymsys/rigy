@@ -7,11 +7,12 @@ from pathlib import Path
 import click
 
 from rigy import __version__
+from rigy.composition import resolve_composition
 from rigy.errors import RigyError
 from rigy.exporter import export_gltf
-from rigy.parser import parse_yaml
+from rigy.parser import parse_with_imports
 from rigy.symmetry import expand_symmetry
-from rigy.validation import validate
+from rigy.validation import validate, validate_composition
 
 
 @click.group()
@@ -41,10 +42,19 @@ def compile(input_file: Path, output: Path | None) -> None:
         output = input_file.parent / f"{stem}.glb"
 
     try:
-        spec = parse_yaml(input_file)
-        spec = expand_symmetry(spec)
-        validate(spec)
-        export_gltf(spec, output)
+        asset = parse_with_imports(input_file)
+        asset.spec = expand_symmetry(asset.spec)
+        validate(asset.spec)
+
+        # Expand symmetry on imported assets too
+        for ns, imported in asset.imported_assets.items():
+            imported.spec = expand_symmetry(imported.spec)
+
+        if asset.spec.instances:
+            validate_composition(asset)
+
+        composed = resolve_composition(asset)
+        export_gltf(composed, output)
         click.echo(f"Compiled: {output}")
     except RigyError as e:
         raise click.ClickException(str(e))

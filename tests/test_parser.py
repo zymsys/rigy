@@ -37,12 +37,20 @@ class TestParseYaml:
             parse_yaml('version: "1.0"\nunits: meters\n')
 
     def test_newer_minor_version_warns(self):
-        yaml_str = 'version: "0.2"\nunits: meters\n'
+        yaml_str = 'version: "0.3"\nunits: meters\n'
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             parse_yaml(yaml_str)
             assert len(w) == 1
             assert "newer" in str(w[0].message).lower()
+
+    def test_v02_accepted_without_warning(self):
+        yaml_str = 'version: "0.2"\nunits: meters\n'
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            spec = parse_yaml(yaml_str)
+            assert len(w) == 0
+            assert spec.version == "0.2"
 
     def test_invalid_version_format(self):
         with pytest.raises(ParseError, match="Invalid version"):

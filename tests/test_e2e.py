@@ -4,10 +4,11 @@ from pathlib import Path
 
 import pygltflib
 
+from rigy.composition import resolve_composition
 from rigy.exporter import export_gltf
-from rigy.parser import parse_yaml
+from rigy.parser import parse_with_imports, parse_yaml
 from rigy.symmetry import expand_symmetry
-from rigy.validation import validate
+from rigy.validation import validate, validate_composition
 
 
 def _compile(yaml_str: str, output_path: Path) -> pygltflib.GLTF2:
@@ -16,6 +17,20 @@ def _compile(yaml_str: str, output_path: Path) -> pygltflib.GLTF2:
     spec = expand_symmetry(spec)
     validate(spec)
     export_gltf(spec, output_path)
+    return pygltflib.GLTF2().load(str(output_path))
+
+
+def _compile_file(input_path: Path, output_path: Path) -> pygltflib.GLTF2:
+    """Full v0.2 compile pipeline from file: parse_with_imports -> expand -> validate -> compose -> export."""
+    asset = parse_with_imports(input_path)
+    asset.spec = expand_symmetry(asset.spec)
+    validate(asset.spec)
+    for _ns, imported in asset.imported_assets.items():
+        imported.spec = expand_symmetry(imported.spec)
+    if asset.spec.instances:
+        validate_composition(asset)
+    composed = resolve_composition(asset)
+    export_gltf(composed, output_path)
     return pygltflib.GLTF2().load(str(output_path))
 
 
@@ -66,33 +81,78 @@ class TestHumanoidFixture:
         assert len(gltf.meshes) >= 1
 
 
-class TestWheelV01Subset:
-    """wheel.rigy.yaml contains v0.2 fields (anchors, name, metadata) — test strict rejection."""
+class TestWheelV02:
+    """wheel.rigy.yaml in composition/parts is now valid v0.2."""
 
-    def test_wheel_rejected_with_v02_fields(self):
-        """Wheel has anchors/metadata/name which are v0.2 fields not in RigySpec."""
+    def test_wheel_parses(self):
+        wheel_path = Path(__file__).parent / "composition" / "parts" / "wheel.rigy.yaml"
+        if not wheel_path.exists():
+            return
+        spec = parse_yaml(wheel_path)
+        assert spec.version == "0.2"
+        assert len(spec.anchors) == 3
+
+
+class TestOldCompositionFixturesRejected:
+    """The old composition/ fixtures at repo root still have extra fields and should be rejected."""
+
+    def test_old_wheel_rejected(self):
         wheel_path = Path(__file__).parent.parent / "composition" / "parts" / "wheel.rigy.yaml"
         if not wheel_path.exists():
             return
         import pytest
         from rigy.errors import ParseError
 
+        # Old wheel has 'name' and 'metadata' fields which are not in RigySpec
         with pytest.raises(ParseError):
             parse_yaml(wheel_path)
 
-
-class TestCarRejectedStrict:
-    """car.rigy.yaml uses v0.2 fields (imports, instances, anchors) — must be rejected."""
-
-    def test_car_rejected(self):
+    def test_old_car_rejected(self):
         car_path = Path(__file__).parent.parent / "composition" / "car.rigy.yaml"
         if not car_path.exists():
             return
         import pytest
         from rigy.errors import ParseError
 
+        # Old car has 'name', 'metadata', and old-format fields
         with pytest.raises(ParseError):
             parse_yaml(car_path)
+
+
+class TestCompositionE2E:
+    def test_car_compiles(self, tmp_path):
+        fixture = Path(__file__).parent / "composition" / "car.rigy.yaml"
+        if not fixture.exists():
+            return
+        out = tmp_path / "car.glb"
+        gltf = _compile_file(fixture, out)
+        assert out.exists()
+        # 1 car body mesh + 4 wheel meshes
+        assert len(gltf.meshes) == 5
+
+    def test_car_has_instance_nodes(self, tmp_path):
+        fixture = Path(__file__).parent / "composition" / "car.rigy.yaml"
+        if not fixture.exists():
+            return
+        out = tmp_path / "car.glb"
+        gltf = _compile_file(fixture, out)
+        node_names = [n.name for n in gltf.nodes]
+        assert "wheel_fl" in node_names
+        assert "wheel_fr" in node_names
+        assert "wheel_rl" in node_names
+        assert "wheel_rr" in node_names
+
+    def test_instance_has_matrix(self, tmp_path):
+        fixture = Path(__file__).parent / "composition" / "car.rigy.yaml"
+        if not fixture.exists():
+            return
+        out = tmp_path / "car.glb"
+        gltf = _compile_file(fixture, out)
+        instance_names = {"wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"}
+        for node in gltf.nodes:
+            if node.name in instance_names:
+                # Instance nodes have matrix set
+                assert node.matrix is not None
 
 
 class TestDeterminism:

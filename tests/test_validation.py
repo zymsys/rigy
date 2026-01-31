@@ -362,3 +362,97 @@ class TestValidation:
         )
         with pytest.raises(ValidationError, match="out of range"):
             validate(spec)
+
+    # --- v0.2 validation tests ---
+
+    def test_duplicate_anchor_id(self):
+        from rigy.models import Anchor
+
+        spec = _make_spec(
+            anchors=[
+                Anchor(id="a1", translation=(0, 0, 0)),
+                Anchor(id="a1", translation=(1, 0, 0)),
+            ],
+        )
+        with pytest.raises(ValidationError, match="Duplicate anchor id"):
+            validate(spec)
+
+    def test_unique_anchors_pass(self):
+        from rigy.models import Anchor
+
+        spec = _make_spec(
+            anchors=[
+                Anchor(id="a1", translation=(0, 0, 0)),
+                Anchor(id="a2", translation=(1, 0, 0)),
+            ],
+        )
+        validate(spec)  # should not raise
+
+    def test_duplicate_instance_id(self):
+        from rigy.models import Attach3, ImportDef, Instance
+
+        spec = _make_spec(
+            imports={"w": ImportDef(source="w.rigy.yaml")},
+            instances=[
+                Instance(
+                    id="i1",
+                    import_="w",
+                    attach3=Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid"),
+                ),
+                Instance(
+                    id="i1",
+                    import_="w",
+                    attach3=Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid"),
+                ),
+            ],
+        )
+        with pytest.raises(ValidationError, match="Duplicate instance id"):
+            validate(spec)
+
+    def test_instance_unknown_import(self):
+        from rigy.models import Attach3, Instance
+
+        spec = _make_spec(
+            instances=[
+                Instance(
+                    id="i1",
+                    import_="nonexistent",
+                    attach3=Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid"),
+                ),
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown import"):
+            validate(spec)
+
+    def test_id_collision_mesh_anchor(self):
+        from rigy.models import Anchor
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "shared_id",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            anchors=[Anchor(id="shared_id", translation=(0, 0, 0))],
+        )
+        with pytest.raises(ValidationError, match="ID collision"):
+            validate(spec)
+
+    def test_no_collision_when_ids_distinct(self):
+        from rigy.models import Anchor
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "mesh1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            anchors=[Anchor(id="anchor1", translation=(0, 0, 0))],
+        )
+        validate(spec)  # should not raise

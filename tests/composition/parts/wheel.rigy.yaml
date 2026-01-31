@@ -1,0 +1,27 @@
+version: "0.2"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: wheel_mesh
+    name: WheelMesh
+    primitives:
+      - type: cylinder
+        id: wheel_geo
+        dimensions:
+          radius: 0.25
+          height: 0.15
+        transform:
+          translation: [0, 0, 0]
+
+anchors:
+  - id: mount_a
+    translation: [0.0, 0.0, 0.0]
+  - id: mount_b
+    translation: [1.0, 0.0, 0.0]
+  - id: mount_c
+    translation: [0.0, 0.0, 1.0]

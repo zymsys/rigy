@@ -1,0 +1,12 @@
+contract_version: "0.1"
+
+required_anchors:
+  - mount_a
+  - mount_b
+  - mount_c
+
+required_frame3_sets:
+  - mount
+
+frame3_sets:
+  mount: [mount_a, mount_b, mount_c]

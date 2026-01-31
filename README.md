@@ -30,19 +30,27 @@ rigy compile humanoid.rigy.yaml  # outputs humanoid.glb
 ### Library
 
 ```python
-from rigy.parser import parse_yaml
+from rigy.parser import parse_with_imports
 from rigy.symmetry import expand_symmetry
-from rigy.validation import validate
+from rigy.validation import validate, validate_composition
+from rigy.composition import resolve_composition
 from rigy.exporter import export_gltf
 from pathlib import Path
 
-spec = parse_yaml("humanoid.rigy.yaml")
-spec = expand_symmetry(spec)
-validate(spec)
-export_gltf(spec, Path("humanoid.glb"))
+asset = parse_with_imports(Path("car.rigy.yaml"))
+asset.spec = expand_symmetry(asset.spec)
+validate(asset.spec)
+for imported in asset.imported_assets.values():
+    imported.spec = expand_symmetry(imported.spec)
+composed = resolve_composition(asset)
+export_gltf(composed, Path("car.glb"))
 ```
 
-## Example
+For v0.1 files without imports, the same pipeline works — `imported_assets` will be empty and `resolve_composition` passes through the root spec.
+
+## Examples
+
+### Humanoid with symmetry (v0.1)
 
 A minimal humanoid with symmetry-expanded legs (`tests/fixtures/humanoid.rigy.yaml`):
 
@@ -105,7 +113,52 @@ symmetry:
 
 The compiler expands `symmetry` before validation, producing mirrored `legR_*` primitives, bones, and weights automatically.
 
-## What's Implemented (v0.1)
+### Composed car with imported wheels (v0.2)
+
+A car body that imports a reusable wheel part and mounts four instances via 3-point anchor frames (`tests/composition/car.rigy.yaml`):
+
+```yaml
+version: "0.2"
+
+imports:
+  wheel:
+    source: parts/wheel.rigy.yaml
+    contract: parts/wheel.ricy.yaml
+
+meshes:
+  - id: car_body_mesh
+    name: CarBody
+    primitives:
+      - type: box
+        id: body
+        dimensions: { x: 2.2, y: 0.4, z: 1.2 }
+        transform: { translation: [0.0, 0.45, 0.0] }
+      - type: box
+        id: cabin
+        dimensions: { x: 0.9, y: 0.35, z: 0.9 }
+        transform: { translation: [-0.3, 0.75, 0.0] }
+
+anchors:
+  - { id: fl_a, translation: [0.8, 0.25, 0.65] }
+  - { id: fl_b, translation: [1.8, 0.25, 0.65] }
+  - { id: fl_c, translation: [0.8, 1.25, 0.65] }
+  # ... and fr_*, rl_*, rr_* anchor triplets
+
+instances:
+  - id: wheel_fl
+    import: wheel
+    attach3:
+      from: [wheel.mount_a, wheel.mount_b, wheel.mount_c]
+      to: [fl_a, fl_b, fl_c]
+      mode: rigid
+  # ... wheel_fr, wheel_rl, wheel_rr
+```
+
+Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` block computes the rigid transform that maps the wheel's mount frame onto the car's anchor frame, positioning and rotating each wheel correctly.
+
+## What's Implemented
+
+### v0.1 — Rigged primitives
 
 **Primitives** — `box`, `sphere`, `capsule`, `cylinder` with fixed tessellation (`v0_1_default` profile), per-primitive transforms, and symbolic material references.
 
@@ -121,13 +174,28 @@ The compiler expands `symmetry` before validation, producing mirrored `legR_*` p
 
 **Export** — glTF 2.0 / GLB with positions, normals, indices, skinning joints/weights, and inverse bind matrices.
 
+### v0.2 — Composition
+
+**Anchors** — Named 3D points on meshes, used as attachment sites. Mirrored by symmetry expansion.
+
+**Imports** — Reference external `.rigy.yaml` files as reusable parts. Resolved recursively with circular import detection.
+
+**Contracts** (`.ricy.yaml`) — Interface definitions that imported parts must satisfy. Specify required anchors and frame3 sets. Validated at composition time.
+
+**Instances** — Place imported parts into a scene. Each instance references an import and an `attach3` block.
+
+**attach3** — 3-point frame alignment. Given three `from` anchors on the imported part and three `to` anchors on the parent, computes the affine transform mapping one frame to the other. Three constraint modes:
+- `rigid` — rotation + translation only (no scale/shear)
+- `uniform` — rotation + translation + uniform scale
+- `affine` — full affine transform (rotation, translation, scale, shear)
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification including the v0.2+ roadmap (composition, contracts, scene DSL).
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification and [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec.
 
 ## Development
 

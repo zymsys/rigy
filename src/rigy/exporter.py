@@ -7,19 +7,23 @@ from pathlib import Path
 import numpy as np
 import pygltflib
 
+from rigy.composition import ComposedAsset, ResolvedInstance
 from rigy.errors import ExportError
 from rigy.models import RigySpec
 from rigy.skinning import SkinData, compute_skinning
 from rigy.tessellation import tessellate_mesh
 
 
-def export_gltf(spec: RigySpec, output_path: Path) -> None:
-    """Export a validated Rigy spec to a GLB file.
+def export_gltf(spec_or_composed: RigySpec | ComposedAsset, output_path: Path) -> None:
+    """Export a validated Rigy spec or composed asset to a GLB file.
 
     Pipeline: tessellate -> skin -> build glTF scene -> write GLB.
     """
     try:
-        gltf = _build_gltf(spec)
+        if isinstance(spec_or_composed, ComposedAsset):
+            gltf = _build_gltf_composed(spec_or_composed)
+        else:
+            gltf = _build_gltf(spec_or_composed)
         gltf.save(str(output_path))
     except Exception as e:
         if isinstance(e, ExportError):
@@ -27,8 +31,8 @@ def export_gltf(spec: RigySpec, output_path: Path) -> None:
         raise ExportError(f"Failed to export glTF: {e}") from e
 
 
-def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
-    """Build the complete glTF2 structure."""
+def _build_gltf_composed(composed: ComposedAsset) -> pygltflib.GLTF2:
+    """Build the complete glTF2 structure for a composed asset."""
     gltf = pygltflib.GLTF2(
         scene=0,
         scenes=[pygltflib.Scene(nodes=[])],
@@ -43,15 +47,102 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
 
     blob_data = bytearray()
     material_map: dict[str, int] = {}
+    scene_nodes: list[int] = []
 
+    # Build root asset meshes (same as v0.1)
+    _build_spec_meshes(gltf, composed.root_spec, blob_data, material_map, scene_nodes)
+
+    # Build instance nodes
+    for inst in composed.instances:
+        _build_instance(gltf, inst, blob_data, material_map, scene_nodes)
+
+    gltf.scenes[0].nodes = scene_nodes
+
+    # Set binary blob
+    gltf.buffers = [pygltflib.Buffer(byteLength=len(blob_data))]
+    gltf.set_binary_blob(bytes(blob_data))
+
+    return gltf
+
+
+def _build_instance(
+    gltf: pygltflib.GLTF2,
+    inst: ResolvedInstance,
+    blob_data: bytearray,
+    material_map: dict[str, int],
+    scene_nodes: list[int],
+) -> None:
+    """Build an instance node with its transform and children."""
+    # Create instance node with attach3 transform matrix (column-major for glTF)
+    mat_col_major = inst.transform.T.flatten().tolist()
+
+    instance_node_idx = len(gltf.nodes)
+    gltf.nodes.append(
+        pygltflib.Node(
+            name=inst.id,
+            matrix=mat_col_major,
+        )
+    )
+    scene_nodes.append(instance_node_idx)
+
+    # Build child nodes for the imported spec
+    child_nodes: list[int] = []
+    _build_spec_meshes(
+        gltf,
+        inst.source_spec,
+        blob_data,
+        material_map,
+        child_nodes,
+        name_prefix=f"{inst.id}.",
+    )
+
+    gltf.nodes[instance_node_idx].children = child_nodes if child_nodes else None
+
+
+def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
+    """Build the complete glTF2 structure (v0.1 path)."""
+    gltf = pygltflib.GLTF2(
+        scene=0,
+        scenes=[pygltflib.Scene(nodes=[])],
+        nodes=[],
+        meshes=[],
+        accessors=[],
+        bufferViews=[],
+        buffers=[],
+        materials=[],
+        skins=[],
+    )
+
+    blob_data = bytearray()
+    material_map: dict[str, int] = {}
+    scene_nodes: list[int] = []
+
+    _build_spec_meshes(gltf, spec, blob_data, material_map, scene_nodes)
+
+    gltf.scenes[0].nodes = scene_nodes
+
+    # Set binary blob
+    gltf.buffers = [pygltflib.Buffer(byteLength=len(blob_data))]
+    gltf.set_binary_blob(bytes(blob_data))
+
+    return gltf
+
+
+def _build_spec_meshes(
+    gltf: pygltflib.GLTF2,
+    spec: RigySpec,
+    blob_data: bytearray,
+    material_map: dict[str, int],
+    scene_nodes: list[int],
+    name_prefix: str = "",
+) -> None:
+    """Build mesh/bone/skin nodes for a spec and append to scene_nodes."""
     # Build binding lookup
     binding_map: dict[str, tuple] = {}  # mesh_id -> (binding, armature)
     for binding in spec.bindings:
         arm = next((a for a in spec.armatures if a.id == binding.armature_id), None)
         if arm:
             binding_map[binding.mesh_id] = (binding, arm)
-
-    scene_nodes: list[int] = []
 
     for mesh_def in spec.meshes:
         mesh_data, prim_ranges = tessellate_mesh(mesh_def, spec.tessellation_profile)
@@ -232,9 +323,10 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
         )
 
         mesh_idx = len(gltf.meshes)
+        mesh_name = name_prefix + (mesh_def.name or mesh_def.id)
         gltf.meshes.append(
             pygltflib.Mesh(
-                name=mesh_def.name or mesh_def.id,
+                name=mesh_name,
                 primitives=[gltf_prim],
             )
         )
@@ -243,7 +335,7 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
         mesh_node_idx = len(gltf.nodes)
         gltf.nodes.append(
             pygltflib.Node(
-                name=mesh_def.name or mesh_def.id,
+                name=mesh_name,
                 mesh=mesh_idx,
             )
         )
@@ -284,7 +376,7 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
 
                 gltf.nodes.append(
                     pygltflib.Node(
-                        name=bone.id,
+                        name=name_prefix + bone.id,
                         translation=translation,
                     )
                 )
@@ -308,9 +400,7 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
 
             # Write IBM data (glTF uses column-major matrices; numpy is row-major)
             ibm_offset = len(blob_data)
-            ibm_col_major = np.ascontiguousarray(
-                skin_data.inverse_bind_matrices.transpose(0, 2, 1)
-            )
+            ibm_col_major = np.ascontiguousarray(skin_data.inverse_bind_matrices.transpose(0, 2, 1))
             ibm_bytes = ibm_col_major.astype(np.float32).tobytes()
             blob_data.extend(ibm_bytes)
 
@@ -341,7 +431,7 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
             skin_idx = len(gltf.skins)
             gltf.skins.append(
                 pygltflib.Skin(
-                    name=armature.name or armature.id,
+                    name=name_prefix + (armature.name or armature.id),
                     joints=joint_node_list,
                     skeleton=skeleton_root,
                     inverseBindMatrices=ibm_acc_idx,
@@ -350,11 +440,3 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
 
             # Assign skin to mesh node
             gltf.nodes[mesh_node_idx].skin = skin_idx
-
-    gltf.scenes[0].nodes = scene_nodes
-
-    # Set binary blob
-    gltf.buffers = [pygltflib.Buffer(byteLength=len(blob_data))]
-    gltf.set_binary_blob(bytes(blob_data))
-
-    return gltf

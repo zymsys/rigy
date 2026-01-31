@@ -19,3 +19,11 @@ class TessellationError(RigyError):
 
 class ExportError(RigyError):
     """Raised when glTF/GLB export fails."""
+
+
+class ContractError(RigyError):
+    """Raised when a contract validation fails."""
+
+
+class CompositionError(RigyError):
+    """Raised when composition (imports, instances, attach3) fails."""

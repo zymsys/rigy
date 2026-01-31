@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 
 from rigy.models import (
+    Anchor,
     Bone,
     BoneWeight,
+    Instance,
     Primitive,
     PrimitiveWeights,
     RigySpec,
@@ -55,6 +57,20 @@ def expand_symmetry(spec: RigySpec) -> RigySpec:
                 mirrored = _mirror_primitive_weights(pw, prefix_from, prefix_to)
                 new_weights.append(mirrored)
         binding.weights.extend(new_weights)
+
+    # Expand anchors
+    new_anchors: list[Anchor] = []
+    for anchor in new_spec.anchors:
+        if anchor.id.startswith(prefix_from):
+            new_anchors.append(_mirror_anchor(anchor, prefix_from, prefix_to))
+    new_spec.anchors.extend(new_anchors)
+
+    # Expand instances: mirror to anchors (local), keep from anchors (imported asset space)
+    new_instances: list[Instance] = []
+    for inst in new_spec.instances:
+        if inst.id.startswith(prefix_from):
+            new_instances.append(_mirror_instance(inst, prefix_from, prefix_to))
+    new_spec.instances.extend(new_instances)
 
     # Clear symmetry after expansion
     new_spec.symmetry = None
@@ -123,3 +139,37 @@ def _mirror_primitive_weights(
         for bw in pw.bones
     ]
     return PrimitiveWeights(primitive_id=new_prim_id, bones=new_bones)
+
+
+def _mirror_anchor(anchor: Anchor, prefix_from: str, prefix_to: str) -> Anchor:
+    """Create a mirrored copy of an anchor with negated X translation."""
+    new_id = _rename(anchor.id, prefix_from, prefix_to)
+    tx, ty, tz = anchor.translation
+    return Anchor(
+        id=new_id,
+        translation=(-tx, ty, tz),
+        scope=anchor.scope,
+    )
+
+
+def _mirror_instance(inst: Instance, prefix_from: str, prefix_to: str) -> Instance:
+    """Create a mirrored copy of an instance.
+
+    - Renames instance ID via prefix substitution
+    - Same import ref (imported asset is immutable)
+    - from anchors unchanged (imported asset space)
+    - to anchors renamed (they reference local anchors that were also mirrored)
+    """
+    new_id = _rename(inst.id, prefix_from, prefix_to)
+    new_to = [_rename(a, prefix_from, prefix_to) for a in inst.attach3.to]
+    from rigy.models import Attach3
+
+    return Instance(
+        id=new_id,
+        import_=inst.import_,
+        attach3=Attach3(
+            from_=list(inst.attach3.from_),
+            to=new_to,
+            mode=inst.attach3.mode,
+        ),
+    )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 from rigy.errors import ValidationError
-from rigy.models import RigySpec
+from rigy.models import ResolvedAsset, RigySpec
 
 
 def validate(spec: RigySpec) -> None:
@@ -24,6 +24,10 @@ def validate(spec: RigySpec) -> None:
     _check_binding_refs(spec)
     _check_mesh_single_binding(spec)
     _check_weights_in_range(spec)
+    _check_unique_anchor_ids(spec)
+    _check_unique_instance_ids(spec)
+    _check_instance_import_refs(spec)
+    _check_no_id_collisions(spec)
 
 
 def _check_unique_mesh_ids(spec: RigySpec) -> None:
@@ -148,3 +152,102 @@ def _check_weights_in_range(spec: RigySpec) -> None:
                         f"Weight {bw.weight} for bone {bw.bone_id!r} on "
                         f"primitive {pw.primitive_id!r} is out of range [0, 1]"
                     )
+
+
+def _check_unique_anchor_ids(spec: RigySpec) -> None:
+    seen: set[str] = set()
+    for anchor in spec.anchors:
+        if anchor.id in seen:
+            raise ValidationError(f"Duplicate anchor id: {anchor.id!r}")
+        seen.add(anchor.id)
+
+
+def _check_unique_instance_ids(spec: RigySpec) -> None:
+    seen: set[str] = set()
+    for inst in spec.instances:
+        if inst.id in seen:
+            raise ValidationError(f"Duplicate instance id: {inst.id!r}")
+        seen.add(inst.id)
+
+
+def _check_instance_import_refs(spec: RigySpec) -> None:
+    for inst in spec.instances:
+        if inst.import_ not in spec.imports:
+            raise ValidationError(
+                f"Instance {inst.id!r} references unknown import: {inst.import_!r}"
+            )
+
+
+def _check_no_id_collisions(spec: RigySpec) -> None:
+    """Check that anchor, mesh, armature, and instance IDs are all distinct."""
+    all_ids: dict[str, str] = {}  # id -> category
+
+    for mesh in spec.meshes:
+        if mesh.id in all_ids:
+            raise ValidationError(
+                f"ID collision: {mesh.id!r} used as both mesh and {all_ids[mesh.id]}"
+            )
+        all_ids[mesh.id] = "mesh"
+
+    for arm in spec.armatures:
+        if arm.id in all_ids:
+            raise ValidationError(
+                f"ID collision: {arm.id!r} used as both armature and {all_ids[arm.id]}"
+            )
+        all_ids[arm.id] = "armature"
+
+    for anchor in spec.anchors:
+        if anchor.id in all_ids:
+            raise ValidationError(
+                f"ID collision: {anchor.id!r} used as both anchor and {all_ids[anchor.id]}"
+            )
+        all_ids[anchor.id] = "anchor"
+
+    for inst in spec.instances:
+        if inst.id in all_ids:
+            raise ValidationError(
+                f"ID collision: {inst.id!r} used as both instance and {all_ids[inst.id]}"
+            )
+        all_ids[inst.id] = "instance"
+
+
+def validate_composition(asset: ResolvedAsset) -> None:
+    """Cross-asset validation for composition.
+
+    Checks that all anchor references in instances can be resolved:
+    - 'from' anchors exist in the imported asset
+    - 'to' anchors exist in the root spec
+
+    Raises:
+        ValidationError: On any cross-asset validation failure.
+    """
+    spec = asset.spec
+    local_anchor_ids = {a.id for a in spec.anchors}
+
+    for inst in spec.instances:
+        imported = asset.imported_assets.get(inst.import_)
+        if imported is None:
+            raise ValidationError(
+                f"Instance {inst.id!r}: imported asset {inst.import_!r} not resolved"
+            )
+
+        imported_anchor_ids = {a.id for a in imported.spec.anchors}
+
+        # Validate 'from' anchor refs
+        for ref in inst.attach3.from_:
+            if "." in ref:
+                _ns, anchor_id = ref.split(".", 1)
+            else:
+                anchor_id = ref
+            if anchor_id not in imported_anchor_ids:
+                raise ValidationError(
+                    f"Instance {inst.id!r}: from anchor {ref!r} not found in "
+                    f"imported asset {inst.import_!r}"
+                )
+
+        # Validate 'to' anchor refs
+        for ref in inst.attach3.to:
+            if ref not in local_anchor_ids:
+                raise ValidationError(
+                    f"Instance {inst.id!r}: to anchor {ref!r} not found in local anchors"
+                )

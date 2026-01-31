@@ -4,15 +4,20 @@ import pytest
 from pydantic import ValidationError
 
 from rigy.models import (
+    Anchor,
     Armature,
+    Attach3,
     Binding,
     Bone,
     BoneWeight,
     CoordinateSystem,
+    ImportDef,
+    Instance,
     Mesh,
     MirrorX,
     Primitive,
     PrimitiveWeights,
+    RicyContract,
     RigySpec,
     Symmetry,
     Transform,
@@ -168,7 +173,7 @@ class TestRigySpec:
 
     def test_unknown_field_rejected(self):
         with pytest.raises(ValidationError, match="extra"):
-            RigySpec(version="0.1", imports={"wheel": {}})
+            RigySpec(version="0.1", unknown_field="value")
 
     def test_full_roundtrip(self, full_humanoid_yaml):
         """Full humanoid spec parses and round-trips through model."""
@@ -181,3 +186,118 @@ class TestRigySpec:
         assert len(spec.armatures) == 1
         assert len(spec.bindings) == 1
         assert spec.symmetry is not None
+
+    def test_v02_fields_optional(self):
+        """v0.2 fields default to empty, so v0.1 files still parse."""
+        spec = RigySpec(version="0.1")
+        assert spec.anchors == []
+        assert spec.imports == {}
+        assert spec.instances == []
+
+    def test_v02_spec_with_anchors(self):
+        spec = RigySpec(
+            version="0.2",
+            anchors=[Anchor(id="a1", translation=(0, 0, 0))],
+        )
+        assert len(spec.anchors) == 1
+        assert spec.anchors[0].id == "a1"
+
+
+class TestAnchor:
+    def test_valid(self):
+        a = Anchor(id="mount_a", translation=(0, 0, 0))
+        assert a.id == "mount_a"
+        assert a.scope is None
+
+    def test_with_scope(self):
+        a = Anchor(id="mount_a", translation=(0, 0, 0), scope="left_door")
+        assert a.scope == "left_door"
+
+    def test_unknown_field_rejected(self):
+        with pytest.raises(ValidationError, match="extra"):
+            Anchor(id="a", translation=(0, 0, 0), color="red")
+
+
+class TestAttach3:
+    def test_valid(self):
+        a = Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid")
+        assert a.from_ == ["a", "b", "c"]
+        assert a.to == ["d", "e", "f"]
+        assert a.mode == "rigid"
+
+    def test_from_alias(self):
+        """'from' alias works."""
+        import yaml
+
+        data = yaml.safe_load("from: [a, b, c]\nto: [d, e, f]\nmode: rigid\n")
+        a = Attach3(**data)
+        assert a.from_ == ["a", "b", "c"]
+
+    def test_from_wrong_count(self):
+        with pytest.raises(ValidationError, match="exactly 3"):
+            Attach3(from_=["a", "b"], to=["d", "e", "f"], mode="rigid")
+
+    def test_to_wrong_count(self):
+        with pytest.raises(ValidationError, match="exactly 3"):
+            Attach3(from_=["a", "b", "c"], to=["d", "e"], mode="rigid")
+
+    def test_invalid_mode(self):
+        with pytest.raises(ValidationError):
+            Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="invalid")
+
+    def test_all_modes(self):
+        for mode in ["rigid", "uniform", "affine"]:
+            a = Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode=mode)
+            assert a.mode == mode
+
+
+class TestInstance:
+    def test_valid(self):
+        inst = Instance(
+            id="wheel_fl",
+            import_="wheel",
+            attach3=Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid"),
+        )
+        assert inst.id == "wheel_fl"
+        assert inst.import_ == "wheel"
+
+    def test_import_alias(self):
+        import yaml
+
+        data = yaml.safe_load(
+            "id: w1\nimport: wheel\nattach3:\n  from: [a, b, c]\n  to: [d, e, f]\n  mode: rigid\n"
+        )
+        inst = Instance(**data)
+        assert inst.import_ == "wheel"
+
+
+class TestImportDef:
+    def test_valid(self):
+        d = ImportDef(source="parts/wheel.rigy.yaml")
+        assert d.source == "parts/wheel.rigy.yaml"
+        assert d.contract is None
+
+    def test_with_contract(self):
+        d = ImportDef(source="parts/wheel.rigy.yaml", contract="parts/wheel.ricy.yaml")
+        assert d.contract == "parts/wheel.ricy.yaml"
+
+
+class TestRicyContract:
+    def test_minimal(self):
+        c = RicyContract(contract_version="0.1")
+        assert c.required_anchors == []
+        assert c.frame3_sets == {}
+
+    def test_full(self):
+        c = RicyContract(
+            contract_version="0.1",
+            required_anchors=["a", "b"],
+            required_frame3_sets=["mount"],
+            frame3_sets={"mount": ["a", "b", "c"]},
+        )
+        assert len(c.required_anchors) == 2
+        assert c.frame3_sets["mount"] == ["a", "b", "c"]
+
+    def test_unknown_field_rejected(self):
+        with pytest.raises(ValidationError, match="extra"):
+            RicyContract(contract_version="0.1", notes="hello")

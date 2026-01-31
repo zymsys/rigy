@@ -81,3 +81,114 @@ class TestSymmetryExpansion:
         ids1 = [p.id for p in result1.meshes[0].primitives]
         ids2 = [p.id for p in result2.meshes[0].primitives]
         assert ids1 == ids2
+
+
+class TestAnchorSymmetry:
+    def test_anchors_mirrored(self):
+        from rigy.models import Anchor, MirrorX, Symmetry
+
+        spec = RigySpec(
+            version="0.2",
+            anchors=[
+                Anchor(id="legL_mount", translation=(0.5, 1.0, 0.0)),
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        anchor_ids = {a.id for a in result.anchors}
+        assert "legL_mount" in anchor_ids
+        assert "legR_mount" in anchor_ids
+
+    def test_anchor_x_negated(self):
+        from rigy.models import Anchor, MirrorX, Symmetry
+
+        spec = RigySpec(
+            version="0.2",
+            anchors=[
+                Anchor(id="legL_mount", translation=(0.5, 1.0, 0.2)),
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        anchors = {a.id: a for a in result.anchors}
+        left = anchors["legL_mount"]
+        right = anchors["legR_mount"]
+        assert left.translation[0] == -right.translation[0]
+        assert left.translation[1] == right.translation[1]
+        assert left.translation[2] == right.translation[2]
+
+    def test_no_matching_anchors_unchanged(self):
+        from rigy.models import Anchor, MirrorX, Symmetry
+
+        spec = RigySpec(
+            version="0.2",
+            anchors=[Anchor(id="center", translation=(0, 0, 0))],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        assert len(result.anchors) == 1
+
+
+class TestInstanceSymmetry:
+    def test_instances_mirrored(self):
+        from rigy.models import Anchor, Attach3, ImportDef, Instance, MirrorX, Symmetry
+
+        spec = RigySpec(
+            version="0.2",
+            anchors=[
+                Anchor(id="legL_a", translation=(0.5, 0, 0)),
+                Anchor(id="legL_b", translation=(1.5, 0, 0)),
+                Anchor(id="legL_c", translation=(0.5, 0, 1)),
+            ],
+            imports={"part": ImportDef(source="part.rigy.yaml")},
+            instances=[
+                Instance(
+                    id="legL_inst",
+                    import_="part",
+                    attach3=Attach3(
+                        from_=["part.a", "part.b", "part.c"],
+                        to=["legL_a", "legL_b", "legL_c"],
+                        mode="rigid",
+                    ),
+                ),
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        inst_ids = {i.id for i in result.instances}
+        assert "legL_inst" in inst_ids
+        assert "legR_inst" in inst_ids
+
+    def test_instance_from_unchanged_to_renamed(self):
+        from rigy.models import Anchor, Attach3, ImportDef, Instance, MirrorX, Symmetry
+
+        spec = RigySpec(
+            version="0.2",
+            anchors=[
+                Anchor(id="legL_a", translation=(0.5, 0, 0)),
+                Anchor(id="legL_b", translation=(1.5, 0, 0)),
+                Anchor(id="legL_c", translation=(0.5, 0, 1)),
+            ],
+            imports={"part": ImportDef(source="part.rigy.yaml")},
+            instances=[
+                Instance(
+                    id="legL_inst",
+                    import_="part",
+                    attach3=Attach3(
+                        from_=["part.a", "part.b", "part.c"],
+                        to=["legL_a", "legL_b", "legL_c"],
+                        mode="rigid",
+                    ),
+                ),
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        mirrored = next(i for i in result.instances if i.id == "legR_inst")
+
+        # from anchors are unchanged (imported asset space)
+        assert mirrored.attach3.from_ == ["part.a", "part.b", "part.c"]
+        # to anchors are renamed
+        assert mirrored.attach3.to == ["legR_a", "legR_b", "legR_c"]
+        # Same import ref
+        assert mirrored.import_ == "part"
