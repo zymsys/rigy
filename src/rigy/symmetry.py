@@ -159,17 +159,25 @@ def _mirror_instance(inst: Instance, prefix_from: str, prefix_to: str) -> Instan
     - Same import ref (imported asset is immutable)
     - from anchors unchanged (imported asset space)
     - to anchors renamed (they reference local anchors that were also mirrored)
+    - For local mesh instances (mesh_id set), renames mesh_id
     """
     new_id = _rename(inst.id, prefix_from, prefix_to)
-    new_to = [_rename(a, prefix_from, prefix_to) for a in inst.attach3.to]
     from rigy.models import Attach3
+
+    new_attach3 = None
+    if inst.attach3 is not None:
+        new_to = [_rename(a, prefix_from, prefix_to) for a in inst.attach3.to]
+        new_attach3 = Attach3(
+            from_=list(inst.attach3.from_),
+            to=new_to,
+            mode=inst.attach3.mode,
+        )
+
+    new_mesh_id = _rename(inst.mesh_id, prefix_from, prefix_to) if inst.mesh_id else None
 
     return Instance(
         id=new_id,
         import_=inst.import_,
-        attach3=Attach3(
-            from_=list(inst.attach3.from_),
-            to=new_to,
-            mode=inst.attach3.mode,
-        ),
+        mesh_id=new_mesh_id,
+        attach3=new_attach3,
     )

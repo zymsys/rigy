@@ -270,6 +270,39 @@ class TestInstance:
         inst = Instance(**data)
         assert inst.import_ == "wheel"
 
+    def test_local_mesh_instance(self):
+        inst = Instance(id="shelf_copy", mesh_id="shelf_mesh")
+        assert inst.mesh_id == "shelf_mesh"
+        assert inst.import_ is None
+        assert inst.attach3 is None
+
+    def test_rejects_both_import_and_mesh_id(self):
+        with pytest.raises(ValidationError, match="not both"):
+            Instance(
+                id="bad",
+                import_="wheel",
+                mesh_id="shelf",
+                attach3=Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid"),
+            )
+
+    def test_rejects_neither_import_nor_mesh_id(self):
+        with pytest.raises(ValidationError, match="either"):
+            Instance(id="bad")
+
+    def test_import_without_attach3_rejected(self):
+        with pytest.raises(ValidationError, match="requires 'attach3'"):
+            Instance(id="bad", import_="wheel")
+
+    def test_local_mesh_with_attach3(self):
+        """Local mesh instances may optionally have attach3."""
+        inst = Instance(
+            id="shelf_copy",
+            mesh_id="shelf_mesh",
+            attach3=Attach3(from_=["a", "b", "c"], to=["d", "e", "f"], mode="rigid"),
+        )
+        assert inst.mesh_id == "shelf_mesh"
+        assert inst.attach3 is not None
+
 
 class TestImportDef:
     def test_valid(self):

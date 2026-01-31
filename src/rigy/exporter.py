@@ -49,12 +49,24 @@ def _build_gltf_composed(composed: ComposedAsset) -> pygltflib.GLTF2:
     material_map: dict[str, int] = {}
     scene_nodes: list[int] = []
 
-    # Build root asset meshes (same as v0.1)
+    # Build root asset meshes (same as v0.1) and track mesh_id -> glTF mesh index
+    mesh_id_to_gltf_idx: dict[str, int] = {}
+    pre_count = len(gltf.meshes)
     _build_spec_meshes(gltf, composed.root_spec, blob_data, material_map, scene_nodes)
+    for i, mesh_def in enumerate(composed.root_spec.meshes):
+        mesh_id_to_gltf_idx[mesh_def.id] = pre_count + i
 
     # Build instance nodes
     for inst in composed.instances:
-        _build_instance(gltf, inst, blob_data, material_map, scene_nodes)
+        if inst.mesh_id is not None:
+            _build_local_mesh_instance(
+                gltf,
+                inst,
+                mesh_id_to_gltf_idx,
+                scene_nodes,
+            )
+        else:
+            _build_instance(gltf, inst, blob_data, material_map, scene_nodes)
 
     gltf.scenes[0].nodes = scene_nodes
 
@@ -97,6 +109,29 @@ def _build_instance(
     )
 
     gltf.nodes[instance_node_idx].children = child_nodes if child_nodes else None
+
+
+def _build_local_mesh_instance(
+    gltf: pygltflib.GLTF2,
+    inst: ResolvedInstance,
+    mesh_id_to_gltf_idx: dict[str, int],
+    scene_nodes: list[int],
+) -> None:
+    """Build a node for a local mesh instance referencing an already-built mesh."""
+    gltf_mesh_idx = mesh_id_to_gltf_idx.get(inst.mesh_id)
+    if gltf_mesh_idx is None:
+        raise ExportError(f"Local mesh instance {inst.id!r}: mesh {inst.mesh_id!r} not found")
+
+    mat_col_major = inst.transform.T.flatten().tolist()
+    node_idx = len(gltf.nodes)
+    gltf.nodes.append(
+        pygltflib.Node(
+            name=inst.id,
+            mesh=gltf_mesh_idx,
+            matrix=mat_col_major,
+        )
+    )
+    scene_nodes.append(node_idx)
 
 
 def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:

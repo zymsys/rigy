@@ -155,6 +155,72 @@ class TestCompositionE2E:
                 assert node.matrix is not None
 
 
+class TestLocalMeshInstanceE2E:
+    def test_local_mesh_instance_compile(self, tmp_path):
+        """Compile a spec with local mesh instances to GLB."""
+        yaml_str = """\
+version: "0.2"
+meshes:
+  - id: shelf
+    primitives:
+      - type: box
+        id: shelf_box
+        dimensions: { x: 1.0, y: 0.1, z: 0.5 }
+        transform:
+          translation: [0, 1.0, 0]
+instances:
+  - id: shelf_copy
+    mesh_id: shelf
+"""
+        spec = parse_yaml(yaml_str)
+        validate(spec)
+        from rigy.models import ResolvedAsset
+
+        asset = ResolvedAsset(spec=spec, path=tmp_path / "test.rigy.yaml")
+        composed = resolve_composition(asset)
+        out = tmp_path / "local_mesh.glb"
+        export_gltf(composed, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert len(gltf.meshes) == 1
+        # Root mesh node + local instance node
+        assert len(gltf.nodes) == 2
+        node_names = [n.name for n in gltf.nodes]
+        assert "shelf_copy" in node_names
+
+
+class TestBakeTransformsE2E:
+    def test_bake_transforms_car(self, tmp_path):
+        fixture = Path(__file__).parent / "composition" / "car.rigy.yaml"
+        if not fixture.exists():
+            return
+        from rigy.composition import bake_transforms
+
+        asset = parse_with_imports(fixture)
+        asset.spec = expand_symmetry(asset.spec)
+        validate(asset.spec)
+        for _ns, imported in asset.imported_assets.items():
+            imported.spec = expand_symmetry(imported.spec)
+        if asset.spec.instances:
+            validate_composition(asset)
+        composed = resolve_composition(asset)
+        baked = bake_transforms(composed)
+
+        out = tmp_path / "car_baked.glb"
+        export_gltf(baked, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert len(gltf.meshes) == 5
+
+        # Instance nodes should have identity matrix after baking
+        import numpy as np
+        from numpy.testing import assert_allclose
+
+        identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+        instance_names = {"wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"}
+        for node in gltf.nodes:
+            if node.name in instance_names:
+                assert_allclose(node.matrix, identity, atol=1e-6)
+
+
 class TestDeterminism:
     def test_identical_bytes(self, minimal_mesh_yaml, tmp_path):
         out1 = tmp_path / "a.glb"

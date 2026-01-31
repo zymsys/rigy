@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from rigy import __version__
+from rigy.composition import bake_transforms as _bake_transforms
 from rigy.composition import resolve_composition
 from rigy.errors import RigyError
 from rigy.exporter import export_gltf
@@ -30,7 +31,13 @@ def main() -> None:
     default=None,
     help="Output GLB file path. Defaults to input name with .glb extension.",
 )
-def compile(input_file: Path, output: Path | None) -> None:
+@click.option(
+    "--bake-transforms",
+    is_flag=True,
+    default=False,
+    help="Bake instance transforms into geometry and bones.",
+)
+def compile(input_file: Path, output: Path | None, bake_transforms: bool = False) -> None:
     """Compile a .rigy.yaml spec to GLB."""
     if output is None:
         # Strip .rigy.yaml or .yaml and add .glb
@@ -54,6 +61,8 @@ def compile(input_file: Path, output: Path | None) -> None:
             validate_composition(asset)
 
         composed = resolve_composition(asset)
+        if bake_transforms:
+            composed = _bake_transforms(composed)
         export_gltf(composed, output)
         click.echo(f"Compiled: {output}")
     except RigyError as e:

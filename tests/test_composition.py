@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from rigy.composition import ComposedAsset, resolve_composition
+from rigy.composition import ComposedAsset, bake_transforms, resolve_composition
 from rigy.errors import CompositionError, ParseError
 from rigy.models import (
     Anchor,
@@ -294,3 +294,217 @@ class TestCompositionFixture:
         _compile(out1)
         _compile(out2)
         assert out1.read_bytes() == out2.read_bytes()
+
+
+class TestLocalMeshInstance:
+    def test_local_mesh_resolves_identity(self):
+        spec = RigySpec(
+            version="0.2",
+            meshes=[
+                {
+                    "id": "shelf",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "shelf_box",
+                            "dimensions": {"x": 1, "y": 0.1, "z": 0.5},
+                        }
+                    ],
+                }
+            ],
+            instances=[Instance(id="shelf_copy", mesh_id="shelf")],
+        )
+        asset = ResolvedAsset(spec=spec, path=Path("/fake"))
+        composed = resolve_composition(asset)
+        assert len(composed.instances) == 1
+        inst = composed.instances[0]
+        assert inst.mesh_id == "shelf"
+        assert inst.source_spec is None
+        assert_allclose(inst.transform, np.eye(4), atol=1e-10)
+
+    def test_local_mesh_with_attach3(self):
+        spec = RigySpec(
+            version="0.2",
+            meshes=[
+                {
+                    "id": "shelf",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "shelf_box",
+                            "dimensions": {"x": 1, "y": 0.1, "z": 0.5},
+                        }
+                    ],
+                }
+            ],
+            anchors=[
+                Anchor(id="from_a", translation=(0, 0, 0)),
+                Anchor(id="from_b", translation=(1, 0, 0)),
+                Anchor(id="from_c", translation=(0, 0, 1)),
+                Anchor(id="to_a", translation=(2, 0, 0)),
+                Anchor(id="to_b", translation=(3, 0, 0)),
+                Anchor(id="to_c", translation=(2, 0, 1)),
+            ],
+            instances=[
+                Instance(
+                    id="shelf_copy",
+                    mesh_id="shelf",
+                    attach3=Attach3(
+                        from_=["from_a", "from_b", "from_c"],
+                        to=["to_a", "to_b", "to_c"],
+                        mode="rigid",
+                    ),
+                )
+            ],
+        )
+        asset = ResolvedAsset(spec=spec, path=Path("/fake"))
+        composed = resolve_composition(asset)
+        inst = composed.instances[0]
+        # Transform should translate by (2, 0, 0)
+        origin = np.array([0, 0, 0, 1])
+        result = inst.transform @ origin
+        assert_allclose(result[:3], [2, 0, 0], atol=1e-10)
+
+    def test_local_mesh_exports(self, tmp_path):
+        from rigy.exporter import export_gltf
+
+        spec = RigySpec(
+            version="0.2",
+            meshes=[
+                {
+                    "id": "shelf",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "shelf_box",
+                            "dimensions": {"x": 1, "y": 0.1, "z": 0.5},
+                        }
+                    ],
+                }
+            ],
+            instances=[Instance(id="shelf_copy", mesh_id="shelf")],
+        )
+        asset = ResolvedAsset(spec=spec, path=Path("/fake"))
+        composed = resolve_composition(asset)
+        out = tmp_path / "local_mesh.glb"
+        export_gltf(composed, out)
+        assert out.exists()
+
+        import pygltflib
+
+        gltf = pygltflib.GLTF2().load(str(out))
+        # 1 root mesh + 1 local instance referencing same mesh
+        assert len(gltf.meshes) == 1
+        # Node for root mesh + node for local instance
+        assert len(gltf.nodes) == 2
+
+
+class TestBakeTransforms:
+    def test_bake_identity_unchanged(self):
+        """Baking identity transforms is a no-op."""
+        wheel_spec = _make_wheel_spec()
+        car_spec = _make_car_spec_with_one_wheel()
+        wheel_asset = ResolvedAsset(spec=wheel_spec, path=Path("/fake/wheel.rigy.yaml"))
+        car_asset = ResolvedAsset(
+            spec=car_spec,
+            path=Path("/fake/car.rigy.yaml"),
+            imported_assets={"wheel": wheel_asset},
+        )
+        composed = resolve_composition(car_asset)
+        # Manually set transform to identity
+        composed.instances[0].transform = np.eye(4)
+        baked = bake_transforms(composed)
+        assert_allclose(baked.instances[0].transform, np.eye(4), atol=1e-10)
+
+    def test_bake_produces_identity_transform(self):
+        """After baking, instance transform should be identity."""
+        wheel_spec = _make_wheel_spec()
+        car_spec = _make_car_spec_with_one_wheel()
+        wheel_asset = ResolvedAsset(spec=wheel_spec, path=Path("/fake/wheel.rigy.yaml"))
+        car_asset = ResolvedAsset(
+            spec=car_spec,
+            path=Path("/fake/car.rigy.yaml"),
+            imported_assets={"wheel": wheel_asset},
+        )
+        composed = resolve_composition(car_asset)
+        original_transform = composed.instances[0].transform.copy()
+        assert not np.allclose(original_transform, np.eye(4))
+
+        baked = bake_transforms(composed)
+        assert_allclose(baked.instances[0].transform, np.eye(4), atol=1e-10)
+        # Original should not be mutated
+        assert_allclose(composed.instances[0].transform, original_transform, atol=1e-10)
+
+    def test_bake_transforms_bone_positions(self):
+        """After baking, bone heads should be in world space."""
+        wheel_spec = RigySpec(
+            version="0.2",
+            meshes=[
+                {
+                    "id": "w_mesh",
+                    "primitives": [
+                        {
+                            "type": "cylinder",
+                            "id": "w_geo",
+                            "dimensions": {"radius": 0.25, "height": 0.15},
+                        }
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "w_arm",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]},
+                    ],
+                }
+            ],
+            anchors=[
+                Anchor(id="mount_a", translation=(0, 0, 0)),
+                Anchor(id="mount_b", translation=(1, 0, 0)),
+                Anchor(id="mount_c", translation=(0, 0, 1)),
+            ],
+        )
+        car_spec = _make_car_spec_with_one_wheel()
+        wheel_asset = ResolvedAsset(spec=wheel_spec, path=Path("/fake/wheel.rigy.yaml"))
+        car_asset = ResolvedAsset(
+            spec=car_spec,
+            path=Path("/fake/car.rigy.yaml"),
+            imported_assets={"wheel": wheel_asset},
+        )
+        composed = resolve_composition(car_asset)
+        T = composed.instances[0].transform
+
+        baked = bake_transforms(composed)
+        baked_bone = baked.instances[0].source_spec.armatures[0].bones[0]
+
+        # The root bone head (0,0,0) should now be at T @ (0,0,0,1)
+        expected = (T @ np.array([0, 0, 0, 1]))[:3]
+        assert_allclose(baked_bone.head, expected, atol=1e-10)
+
+    def test_baked_car_exports(self, tmp_path):
+        """Car with bake-transforms should produce valid GLB."""
+        fixture = Path(__file__).parent / "composition" / "car.rigy.yaml"
+        if not fixture.exists():
+            pytest.skip("Car fixture not found")
+
+        from rigy.exporter import export_gltf
+        from rigy.parser import parse_with_imports
+        from rigy.symmetry import expand_symmetry
+        from rigy.validation import validate
+
+        asset = parse_with_imports(fixture)
+        asset.spec = expand_symmetry(asset.spec)
+        validate(asset.spec)
+        for ns, imported in asset.imported_assets.items():
+            imported.spec = expand_symmetry(imported.spec)
+        composed = resolve_composition(asset)
+        baked = bake_transforms(composed)
+        out = tmp_path / "car_baked.glb"
+        export_gltf(baked, out)
+        assert out.exists()
+
+        import pygltflib
+
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert len(gltf.meshes) == 5

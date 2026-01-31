@@ -1,5 +1,7 @@
 """Tests for semantic validation."""
 
+import warnings
+
 import pytest
 import yaml
 
@@ -456,3 +458,84 @@ class TestValidation:
             anchors=[Anchor(id="anchor1", translation=(0, 0, 0))],
         )
         validate(spec)  # should not raise
+
+    # --- Local mesh instance validation ---
+
+    def test_local_mesh_instance_valid(self):
+        from rigy.models import Instance
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "shelf",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            instances=[Instance(id="shelf_copy", mesh_id="shelf")],
+        )
+        validate(spec)  # should not raise
+
+    def test_local_mesh_instance_unknown_mesh(self):
+        from rigy.models import Instance
+
+        spec = _make_spec(
+            instances=[Instance(id="bad_copy", mesh_id="nonexistent")],
+        )
+        with pytest.raises(ValidationError, match="unknown mesh"):
+            validate(spec)
+
+    def test_local_mesh_instance_no_import_check(self):
+        """Local mesh instances should not trigger import ref check."""
+        from rigy.models import Instance
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "shelf",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            instances=[Instance(id="shelf_copy", mesh_id="shelf")],
+        )
+        validate(spec)  # should not raise (no import check for local mesh)
+
+    # --- Armature root warning ---
+
+    def test_armature_root_at_origin_no_warning(self):
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ]
+        )
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            validate(spec)
+            armature_warnings = [x for x in w if "armature root" in str(x.message).lower()]
+            assert len(armature_warnings) == 0
+
+    def test_armature_root_not_at_origin_warns(self):
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0.9, 0], "tail": [0, 1.0, 0]}
+                    ],
+                }
+            ]
+        )
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            validate(spec)
+            armature_warnings = [x for x in w if "root bone" in str(x.message)]
+            assert len(armature_warnings) == 1
+            assert "a1" in str(armature_warnings[0].message)

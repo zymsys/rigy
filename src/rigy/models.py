@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CoordinateSystem(BaseModel):
@@ -147,8 +147,21 @@ class Instance(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     id: str
-    import_: str = Field(alias="import")
-    attach3: Attach3
+    import_: str | None = Field(default=None, alias="import")
+    mesh_id: str | None = None
+    attach3: Attach3 | None = None
+
+    @model_validator(mode="after")
+    def _check_import_or_mesh(self) -> Instance:
+        has_import = self.import_ is not None
+        has_mesh = self.mesh_id is not None
+        if has_import and has_mesh:
+            raise ValueError("Instance must set either 'import' or 'mesh_id', not both")
+        if not has_import and not has_mesh:
+            raise ValueError("Instance must set either 'import' or 'mesh_id'")
+        if has_import and self.attach3 is None:
+            raise ValueError("Instance with 'import' requires 'attach3'")
+        return self
 
 
 class RicyContract(BaseModel):

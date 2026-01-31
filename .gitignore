@@ -24,3 +24,6 @@ Thumbs.db
 # Environment
 .env
 .env.*
+
+# Other
+spec/attic/

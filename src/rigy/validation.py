@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 from rigy.errors import ValidationError
 from rigy.models import ResolvedAsset, RigySpec
@@ -27,7 +28,9 @@ def validate(spec: RigySpec) -> None:
     _check_unique_anchor_ids(spec)
     _check_unique_instance_ids(spec)
     _check_instance_import_refs(spec)
+    _check_instance_mesh_refs(spec)
     _check_no_id_collisions(spec)
+    _warn_armature_root_not_at_origin(spec)
 
 
 def _check_unique_mesh_ids(spec: RigySpec) -> None:
@@ -172,10 +175,21 @@ def _check_unique_instance_ids(spec: RigySpec) -> None:
 
 def _check_instance_import_refs(spec: RigySpec) -> None:
     for inst in spec.instances:
+        if inst.import_ is None:
+            continue  # local mesh instance
         if inst.import_ not in spec.imports:
             raise ValidationError(
                 f"Instance {inst.id!r} references unknown import: {inst.import_!r}"
             )
+
+
+def _check_instance_mesh_refs(spec: RigySpec) -> None:
+    mesh_ids = {m.id for m in spec.meshes}
+    for inst in spec.instances:
+        if inst.mesh_id is None:
+            continue
+        if inst.mesh_id not in mesh_ids:
+            raise ValidationError(f"Instance {inst.id!r} references unknown mesh: {inst.mesh_id!r}")
 
 
 def _check_no_id_collisions(spec: RigySpec) -> None:
@@ -225,6 +239,8 @@ def validate_composition(asset: ResolvedAsset) -> None:
     local_anchor_ids = {a.id for a in spec.anchors}
 
     for inst in spec.instances:
+        if inst.import_ is None:
+            continue  # local mesh instance, no cross-asset validation needed
         imported = asset.imported_assets.get(inst.import_)
         if imported is None:
             raise ValidationError(
@@ -251,3 +267,18 @@ def validate_composition(asset: ResolvedAsset) -> None:
                 raise ValidationError(
                     f"Instance {inst.id!r}: to anchor {ref!r} not found in local anchors"
                 )
+
+
+def _warn_armature_root_not_at_origin(spec: RigySpec) -> None:
+    """Emit a warning if any armature's root bone has head != (0,0,0)."""
+    for arm in spec.armatures:
+        for bone in arm.bones:
+            if bone.parent == "none":
+                hx, hy, hz = bone.head
+                if abs(hx) > 1e-9 or abs(hy) > 1e-9 or abs(hz) > 1e-9:
+                    warnings.warn(
+                        f"Armature {arm.id!r}: root bone {bone.id!r} head is "
+                        f"({hx}, {hy}, {hz}), not at origin. Convention is to "
+                        f"place the armature root at (0, 0, 0).",
+                        stacklevel=2,
+                    )
