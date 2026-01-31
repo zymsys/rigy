@@ -1,0 +1,15 @@
+contract_version: "0.1"
+name: WheelContract
+
+metadata:
+  description: |
+    Contract (interface) for wheels intended to be mounted onto a chassis.
+    Defines the required 3-point mount frame anchor set.
+
+anchors:
+  mount_frame3: [mount_a, mount_b, mount_c]
+
+notes:
+  - mount_a is the origin of the wheel mount frame
+  - mount_b defines +X axis direction from mount_a
+  - mount_c defines the plane to resolve Y/Z via a right-handed frame

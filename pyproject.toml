@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rigy"
+version = "0.1.0"
+description = "Rigy — text-based specification language for rigged assemblies of geometric primitives"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "pygltflib>=1.16",
+    "numpy>=1.26",
+    "click>=8.0",
+]
+
+[project.scripts]
+rigy = "rigy.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rigy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
