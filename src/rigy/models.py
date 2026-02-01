@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.5 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.6 specs."""
 
 from __future__ import annotations
 
@@ -40,6 +40,12 @@ class Primitive(BaseModel):
         if not v:
             raise ValueError("dimensions must not be empty")
         return v
+
+
+class Material(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_color: list[float]
 
 
 class Mesh(BaseModel):
@@ -260,6 +266,7 @@ class RigySpec(BaseModel):
     units: Literal["meters"] = "meters"
     coordinate_system: CoordinateSystem = CoordinateSystem(up="Y", forward="-Z", handedness="right")
     tessellation_profile: str = "v0_1_default"
+    materials: dict[str, Material] = {}
     meshes: list[Mesh] = []
     armatures: list[Armature] = []
     bindings: list[Binding] = []

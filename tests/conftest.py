@@ -33,13 +33,17 @@ meshes:
 def full_humanoid_yaml():
     """Full humanoid spec with armature, binding, and symmetry."""
     return """\
-version: "0.1"
+version: "0.6"
 units: meters
 coordinate_system:
   up: Y
   forward: -Z
   handedness: right
 tessellation_profile: v0_1_default
+
+materials:
+  skin:
+    base_color: [0.8, 0.6, 0.5, 1.0]
 
 meshes:
   - id: humanoid_mesh

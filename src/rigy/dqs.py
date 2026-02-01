@@ -172,7 +172,10 @@ def _evaluate_dqs(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Evaluate DQS deformation."""
     bone_dqs = _build_bone_dual_quaternions(
-        armature, pose, skin_data.inverse_bind_matrices, skin_data.joint_names,
+        armature,
+        pose,
+        skin_data.inverse_bind_matrices,
+        skin_data.joint_names,
     )
 
     # Map joint names to dual quaternions (indexed by joint index)

@@ -330,3 +330,33 @@ class TestInstanceSymmetry:
         assert mirrored.attach3.to == ["legR_a", "legR_b", "legR_c"]
         # Same import ref
         assert mirrored.import_ == "part"
+
+
+class TestMaterialSymmetry:
+    def test_material_preserved_on_mirrored_primitive(self):
+        from rigy.models import Material, MirrorX, Symmetry
+
+        spec = RigySpec(
+            version="0.6",
+            materials={"skin": Material(base_color=[0.8, 0.6, 0.5, 1.0])},
+            meshes=[
+                {
+                    "id": "mesh",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "legL_part",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "transform": {"translation": [0.5, 0, 0]},
+                            "material": "skin",
+                        }
+                    ],
+                }
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        prims = {p.id: p for p in result.meshes[0].primitives}
+        assert prims["legL_part"].material == "skin"
+        assert prims["legR_part"].material == "skin"
+        assert "skin" in result.materials

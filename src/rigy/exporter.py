@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -30,7 +32,7 @@ def export_gltf(
             gltf = _build_gltf_composed(spec_or_composed, yaml_dir=yaml_dir)
         else:
             gltf = _build_gltf(spec_or_composed, yaml_dir=yaml_dir)
-        gltf.save(str(output_path))
+        _save_glb_deterministic(gltf, output_path)
     except Exception as e:
         if isinstance(e, ExportError):
             raise
@@ -51,11 +53,73 @@ def export_baked_gltf(
     """
     try:
         gltf = _build_gltf_baked(spec, pose, yaml_dir=yaml_dir)
-        gltf.save(str(output_path))
+        _save_glb_deterministic(gltf, output_path)
     except Exception as e:
         if isinstance(e, ExportError):
             raise
         raise ExportError(f"Failed to export baked glTF: {e}") from e
+
+
+def _build_material(mat_id: str, spec: RigySpec) -> pygltflib.Material:
+    """Build a glTF Material from a Rigy material definition."""
+    mat = spec.materials[mat_id]
+    base_color = [float(np.float32(c)) for c in mat.base_color]
+    alpha = base_color[3]
+    return pygltflib.Material(
+        name=mat_id,
+        pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(
+            baseColorFactor=base_color,
+            metallicFactor=0.0,
+            roughnessFactor=1.0,
+        ),
+        alphaMode="OPAQUE" if alpha == 1.0 else "BLEND",
+        doubleSided=False,
+    )
+
+
+def _save_glb_deterministic(gltf: pygltflib.GLTF2, output_path: Path) -> None:
+    """Save GLB with deterministic baseColorFactor serialization (6 decimal places)."""
+    glb_bytes = b"".join(gltf.save_to_bytes())
+
+    # Parse GLB structure: 12-byte header + chunks
+    _magic, _version, _length = struct.unpack_from("<III", glb_bytes, 0)
+    json_chunk_length = struct.unpack_from("<I", glb_bytes, 12)[0]
+    json_chunk_type = struct.unpack_from("<I", glb_bytes, 16)[0]
+    assert json_chunk_type == 0x4E4F534A  # "JSON"
+
+    json_bytes = glb_bytes[20 : 20 + json_chunk_length]
+    json_str = json_bytes.decode("utf-8").rstrip("\x20")  # strip padding spaces
+
+    # Replace baseColorFactor arrays with 6-decimal formatting
+    def _format_base_color(m: re.Match) -> str:
+        # Parse the array values
+        inner = m.group(1)
+        values = [float(v) for v in inner.split(",")]
+        formatted = ",".join(f"{v:.6f}" for v in values)
+        return f'"baseColorFactor":[{formatted}]'
+
+    json_str = re.sub(
+        r'"baseColorFactor":\[([^\]]+)\]',
+        _format_base_color,
+        json_str,
+    )
+
+    # Re-encode and pad to 4-byte alignment
+    new_json_bytes = json_str.encode("utf-8")
+    padding_needed = (4 - len(new_json_bytes) % 4) % 4
+    new_json_bytes += b"\x20" * padding_needed  # space padding for JSON chunk
+
+    # Rebuild GLB
+    rest_of_glb = glb_bytes[20 + json_chunk_length :]  # BIN chunk(s)
+    total_length = 12 + 8 + len(new_json_bytes) + len(rest_of_glb)
+
+    out = bytearray()
+    out += struct.pack("<III", 0x46546C67, 2, total_length)  # GLB header
+    out += struct.pack("<II", len(new_json_bytes), 0x4E4F534A)  # JSON chunk header
+    out += new_json_bytes
+    out += rest_of_glb
+
+    output_path.write_bytes(bytes(out))
 
 
 def _build_gltf_baked(
@@ -98,12 +162,15 @@ def _build_gltf_baked(
         for prim in mesh_def.primitives:
             if prim.material and prim.material not in material_map:
                 mat_idx = len(gltf.materials)
-                gltf.materials.append(
-                    pygltflib.Material(
-                        name=prim.material,
-                        pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(),
+                if prim.material in spec.materials:
+                    gltf.materials.append(_build_material(prim.material, spec))
+                else:
+                    gltf.materials.append(
+                        pygltflib.Material(
+                            name=prim.material,
+                            pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(),
+                        )
                     )
-                )
                 material_map[prim.material] = mat_idx
 
         # Get deformed positions/normals if bound
@@ -432,12 +499,15 @@ def _build_spec_meshes(
         for prim in mesh_def.primitives:
             if prim.material and prim.material not in material_map:
                 mat_idx = len(gltf.materials)
-                gltf.materials.append(
-                    pygltflib.Material(
-                        name=prim.material,
-                        pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(),
+                if prim.material in spec.materials:
+                    gltf.materials.append(_build_material(prim.material, spec))
+                else:
+                    gltf.materials.append(
+                        pygltflib.Material(
+                            name=prim.material,
+                            pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(),
+                        )
                     )
-                )
                 material_map[prim.material] = mat_idx
 
         # Write position data

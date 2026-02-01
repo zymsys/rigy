@@ -984,3 +984,175 @@ class TestPoseBoneRefs:
             poses=[Pose(id="p1", bones={"root": PoseBoneTransform(rotation=(1.0, 0, 0, 0))})],
         )
         validate(spec)  # should not raise
+
+
+class TestMaterialValidation:
+    def test_v38_unknown_material_ref(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "nonexistent",
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown material"):
+            validate(spec)
+
+    def test_v39_base_color_wrong_length(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"red": Material(base_color=[1.0, 0.0, 0.0])},
+        )
+        with pytest.raises(ValidationError, match="4 components"):
+            validate(spec)
+
+    def test_v40_base_color_out_of_range_high(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"bad": Material(base_color=[1.5, 0.0, 0.0, 1.0])},
+        )
+        with pytest.raises(ValidationError, match="outside.*0.0.*1.0"):
+            validate(spec)
+
+    def test_v40_base_color_out_of_range_low(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"bad": Material(base_color=[-0.1, 0.0, 0.0, 1.0])},
+        )
+        with pytest.raises(ValidationError, match="outside.*0.0.*1.0"):
+            validate(spec)
+
+    def test_v40_base_color_nan(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"bad": Material(base_color=[float("nan"), 0.0, 0.0, 1.0])},
+        )
+        with pytest.raises(ValidationError, match="not finite"):
+            validate(spec)
+
+    def test_v41_inconsistent_material_refs(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={
+                "red": Material(base_color=[1.0, 0.0, 0.0, 1.0]),
+                "blue": Material(base_color=[0.0, 0.0, 1.0, 1.0]),
+            },
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "red",
+                        },
+                        {
+                            "type": "box",
+                            "id": "p2",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "blue",
+                        },
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="inconsistent material"):
+            validate(spec)
+
+    def test_v41_mixed_none_and_material(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"red": Material(base_color=[1.0, 0.0, 0.0, 1.0])},
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "red",
+                        },
+                        {
+                            "type": "box",
+                            "id": "p2",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                        },
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="inconsistent material"):
+            validate(spec)
+
+    def test_v42_material_id_collision_with_mesh(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"shared": Material(base_color=[1.0, 0.0, 0.0, 1.0])},
+            meshes=[
+                {
+                    "id": "shared",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "shared",
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="ID collision"):
+            validate(spec)
+
+    def test_valid_material_passes(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"red": Material(base_color=[1.0, 0.0, 0.0, 1.0])},
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "red",
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+    def test_no_material_still_valid(self):
+        spec = _make_spec(
+            version="0.6",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise

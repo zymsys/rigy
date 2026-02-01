@@ -15,6 +15,10 @@ def validate(spec: RigySpec) -> None:
     Raises:
         ValidationError: On any semantic rule violation.
     """
+    _check_material_base_color_length(spec)
+    _check_material_base_color_range(spec)
+    _check_material_refs(spec)
+    _check_mesh_material_consistency(spec)
     _check_unique_mesh_ids(spec)
     _check_unique_primitive_ids(spec)
     _check_unique_armature_ids(spec)
@@ -270,8 +274,15 @@ def _check_instance_mesh_refs(spec: RigySpec) -> None:
 
 
 def _check_no_id_collisions(spec: RigySpec) -> None:
-    """Check that anchor, mesh, armature, and instance IDs are all distinct."""
+    """Check that material, anchor, mesh, armature, and instance IDs are all distinct."""
     all_ids: dict[str, str] = {}  # id -> category
+
+    for mat_id in spec.materials:
+        if mat_id in all_ids:
+            raise ValidationError(
+                f"ID collision: {mat_id!r} used as both material and {all_ids[mat_id]}"
+            )
+        all_ids[mat_id] = "material"
 
     for mesh in spec.meshes:
         if mesh.id in all_ids:
@@ -343,6 +354,52 @@ def validate_composition(asset: ResolvedAsset) -> None:
             if ref not in local_anchor_ids:
                 raise ValidationError(
                     f"Instance {inst.id!r}: to anchor {ref!r} not found in local anchors"
+                )
+
+
+def _check_material_base_color_length(spec: RigySpec) -> None:
+    """V39: Each material's base_color must have exactly 4 components."""
+    for mat_id, mat in spec.materials.items():
+        if len(mat.base_color) != 4:
+            raise ValidationError(
+                f"Material {mat_id!r}: base_color must have 4 components, got {len(mat.base_color)}"
+            )
+
+
+def _check_material_base_color_range(spec: RigySpec) -> None:
+    """V40: Each base_color component must be finite and in [0.0, 1.0]."""
+    for mat_id, mat in spec.materials.items():
+        for i, c in enumerate(mat.base_color):
+            if not math.isfinite(c):
+                raise ValidationError(f"Material {mat_id!r}: base_color[{i}] is not finite ({c})")
+            if c < 0.0 or c > 1.0:
+                raise ValidationError(
+                    f"Material {mat_id!r}: base_color[{i}] = {c} is outside [0.0, 1.0]"
+                )
+
+
+def _check_material_refs(spec: RigySpec) -> None:
+    """V38: Primitive material references must exist in the materials table."""
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            if prim.material is not None and prim.material not in spec.materials:
+                raise ValidationError(
+                    f"Primitive {prim.id!r} references unknown material: {prim.material!r}"
+                )
+
+
+def _check_mesh_material_consistency(spec: RigySpec) -> None:
+    """V41: All primitives in a mesh must share the same material reference."""
+    for mesh in spec.meshes:
+        if not mesh.primitives:
+            continue
+        first_mat = mesh.primitives[0].material
+        for prim in mesh.primitives[1:]:
+            if prim.material != first_mat:
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: inconsistent material references — "
+                    f"primitive {mesh.primitives[0].id!r} has material {first_mat!r}, "
+                    f"but primitive {prim.id!r} has material {prim.material!r}"
                 )
 
 

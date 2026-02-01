@@ -184,7 +184,7 @@ class TestRigySpec:
 
         data = yaml.safe_load(full_humanoid_yaml)
         spec = RigySpec(**data)
-        assert spec.version == "0.1"
+        assert spec.version == "0.6"
         assert len(spec.meshes) == 1
         assert len(spec.armatures) == 1
         assert len(spec.bindings) == 1

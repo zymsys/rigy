@@ -1,0 +1,18 @@
+version: "0.6"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: bad_box
+    primitives:
+      - type: box
+        id: box1
+        dimensions:
+          x: 1.0
+          y: 1.0
+          z: 1.0
+        material: nonexistent

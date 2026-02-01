@@ -50,18 +50,22 @@ For v0.1 files without imports, the same pipeline works — `imported_assets` wi
 
 ## Examples
 
-### Humanoid with symmetry (v0.1)
+### Humanoid with symmetry and materials (v0.6)
 
-A minimal humanoid with symmetry-expanded legs (`tests/fixtures/humanoid.rigy.yaml`):
+A minimal humanoid with symmetry-expanded legs and a solid-color material (`tests/fixtures/humanoid.rigy.yaml`):
 
 ```yaml
-version: "0.1"
+version: "0.6"
 units: meters
 coordinate_system:
   up: Y
   forward: -Z
   handedness: right
 tessellation_profile: v0_1_default
+
+materials:
+  skin:
+    base_color: [0.8, 0.6, 0.5, 1.0]
 
 meshes:
   - id: humanoid_mesh
@@ -111,7 +115,7 @@ symmetry:
     prefix_to: "legR_"
 ```
 
-The compiler expands `symmetry` before validation, producing mirrored `legR_*` primitives, bones, and weights automatically.
+The compiler expands `symmetry` before validation, producing mirrored `legR_*` primitives, bones, and weights automatically. The `materials` table defines named solid-color materials referenced by primitives — all primitives in a mesh must share the same material.
 
 ### Composed car with imported wheels (v0.2)
 
@@ -233,13 +237,25 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 
 **Conformance fixtures** — Six new test cases (L01–N02) covering identity pose, two-bone twist, mixed solver, top-level override, opposing-hemisphere quaternions, and near-antipodal blending.
 
+### v0.6 — Solid-color materials
+
+**Materials table** — Named materials defined at the top level with `base_color: [r, g, b, a]` in linear RGBA. Each component must be a finite float in `[0.0, 1.0]`.
+
+**Primitive assignment** — Primitives reference materials by ID. All primitives within a mesh must share the same material (or all omit it). Omitting `material` uses the implicit default (`[1.0, 1.0, 1.0, 1.0]`).
+
+**glTF export** — Materials export as `pbrMetallicRoughness.baseColorFactor` with `metallicFactor=0.0`, `roughnessFactor=1.0`. Alpha 1.0 maps to `alphaMode: OPAQUE`, otherwise `BLEND`. `baseColorFactor` values are serialized with exactly 6 decimal places for cross-platform determinism.
+
+**Validation (V37–V42)** — Duplicate material IDs, unknown material references, base_color length/range checks, mesh material consistency, and material ID collisions with other namespaces.
+
+**Conformance fixtures** — Three new test cases (O01–O03) covering minimal material, material with skinning, and invalid material reference.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, and [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, and [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment.
 
 ## Development
 

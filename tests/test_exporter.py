@@ -1,10 +1,13 @@
 """Tests for glTF/GLB export."""
 
+import json
+import struct
+
 import yaml
 import pygltflib
 
 from rigy.exporter import export_gltf
-from rigy.models import RigySpec
+from rigy.models import Material, RigySpec
 from rigy.symmetry import expand_symmetry
 from rigy.validation import validate
 
@@ -128,3 +131,128 @@ class TestExporter:
         export_gltf(spec, out1)
         export_gltf(spec, out2)
         assert out1.read_bytes() == out2.read_bytes()
+
+
+def _make_material_spec(**overrides):
+    base = {
+        "version": "0.6",
+        "units": "meters",
+        "coordinate_system": {"up": "Y", "forward": "-Z", "handedness": "right"},
+        "tessellation_profile": "v0_1_default",
+        "materials": {"red": Material(base_color=[0.8, 0.2, 0.1, 1.0])},
+        "meshes": [
+            {
+                "id": "m1",
+                "primitives": [
+                    {
+                        "type": "box",
+                        "id": "p1",
+                        "dimensions": {"x": 1, "y": 1, "z": 1},
+                        "material": "red",
+                    }
+                ],
+            }
+        ],
+    }
+    base.update(overrides)
+    return RigySpec(**base)
+
+
+def _extract_glb_json(glb_path) -> dict:
+    """Extract the JSON chunk from a GLB file."""
+    data = glb_path.read_bytes()
+    json_chunk_length = struct.unpack_from("<I", data, 12)[0]
+    json_bytes = data[20 : 20 + json_chunk_length]
+    return json.loads(json_bytes.decode("utf-8"))
+
+
+class TestMaterialExport:
+    def test_material_base_color_exported(self, tmp_path):
+        spec = _make_material_spec()
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert len(gltf.materials) == 1
+        mat = gltf.materials[0]
+        assert mat.name == "red"
+        assert mat.pbrMetallicRoughness.metallicFactor == 0.0
+        assert mat.pbrMetallicRoughness.roughnessFactor == 1.0
+        bcf = mat.pbrMetallicRoughness.baseColorFactor
+        assert len(bcf) == 4
+        assert abs(bcf[0] - 0.8) < 1e-5
+        assert abs(bcf[1] - 0.2) < 1e-5
+        assert abs(bcf[2] - 0.1) < 1e-5
+        assert abs(bcf[3] - 1.0) < 1e-5
+
+    def test_alpha_opaque_mode(self, tmp_path):
+        spec = _make_material_spec()
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert gltf.materials[0].alphaMode == "OPAQUE"
+
+    def test_alpha_blend_mode(self, tmp_path):
+        spec = _make_material_spec(
+            materials={"glass": Material(base_color=[0.7, 0.8, 0.9, 0.3])},
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "glass",
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert gltf.materials[0].alphaMode == "BLEND"
+
+    def test_deterministic_base_color_serialization(self, tmp_path):
+        spec = _make_material_spec()
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        glb_json = _extract_glb_json(out)
+        mat = glb_json["materials"][0]
+        bcf = mat["pbrMetallicRoughness"]["baseColorFactor"]
+        # Check 6 decimal places in the raw JSON text
+        raw = out.read_bytes()
+        json_len = struct.unpack_from("<I", raw, 12)[0]
+        json_str = raw[20 : 20 + json_len].decode("utf-8")
+        assert '"baseColorFactor":[0.800000,0.200000,0.100000,1.000000]' in json_str
+
+    def test_material_determinism(self, tmp_path):
+        spec = _make_material_spec()
+        validate(spec)
+        out1 = tmp_path / "test1.glb"
+        out2 = tmp_path / "test2.glb"
+        export_gltf(spec, out1)
+        export_gltf(spec, out2)
+        assert out1.read_bytes() == out2.read_bytes()
+
+    def test_no_material_no_gltf_material(self, tmp_path):
+        spec = RigySpec(
+            version="0.6",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        assert len(gltf.materials) == 0

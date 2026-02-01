@@ -36,7 +36,7 @@ class TestParseYaml:
 
     def test_unsupported_minor_version_error(self):
         with pytest.raises(ParseError, match="Unsupported version"):
-            parse_yaml('version: "0.6"\nunits: meters\n')
+            parse_yaml('version: "0.7"\nunits: meters\n')
 
     def test_v05_accepted(self):
         spec = parse_yaml('version: "0.5"\nunits: meters\n')
@@ -61,6 +61,33 @@ class TestParseYaml:
     def test_file_not_found(self, tmp_path):
         with pytest.raises(ParseError, match="Cannot read"):
             parse_yaml(tmp_path / "nonexistent.yaml")
+
+    def test_v06_accepted(self):
+        spec = parse_yaml('version: "0.6"\nunits: meters\n')
+        assert spec.version == "0.6"
+
+    def test_material_parsed(self):
+        yaml_str = """\
+version: "0.6"
+units: meters
+materials:
+  red:
+    base_color: [1.0, 0.0, 0.0, 1.0]
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions:
+          x: 1
+          y: 1
+          z: 1
+        material: red
+"""
+        spec = parse_yaml(yaml_str)
+        assert "red" in spec.materials
+        assert spec.materials["red"].base_color == [1.0, 0.0, 0.0, 1.0]
+        assert spec.meshes[0].primitives[0].material == "red"
 
     def test_schema_error_wrapped(self):
         yaml_str = 'version: "0.1"\nmeshes:\n  - id: m\n    primitives:\n      - type: invalid_type\n        id: p\n        dimensions:\n          x: 1\n'
