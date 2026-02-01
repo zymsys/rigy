@@ -93,30 +93,45 @@ class TestWheelV02:
         assert len(spec.anchors) == 3
 
 
-class TestOldCompositionFixturesRejected:
-    """The old composition/ fixtures at repo root still have extra fields and should be rejected."""
+class TestUnknownFieldsRejected:
+    """Strict parsing rejects YAML with unknown top-level fields."""
 
-    def test_old_wheel_rejected(self):
-        wheel_path = Path(__file__).parent.parent / "composition" / "parts" / "wheel.rigy.yaml"
-        if not wheel_path.exists():
-            return
+    def test_unknown_name_field_rejected(self):
         import pytest
         from rigy.errors import ParseError
 
-        # Old wheel has 'name' and 'metadata' fields which are not in RigySpec
+        yaml_str = """\
+rigy_version: "0.1"
+name: BasicWheel
+meshes:
+  - id: wheel_mesh
+    primitives:
+      - type: cylinder
+        id: wheel_geo
+        dimensions:
+          radius: 0.25
+          height: 0.15
+"""
         with pytest.raises(ParseError):
-            parse_yaml(wheel_path)
+            parse_yaml(yaml_str)
 
-    def test_old_car_rejected(self):
-        car_path = Path(__file__).parent.parent / "composition" / "car.rigy.yaml"
-        if not car_path.exists():
-            return
+    def test_unknown_metadata_field_rejected(self):
         import pytest
         from rigy.errors import ParseError
 
-        # Old car has 'name', 'metadata', and old-format fields
+        yaml_str = """\
+rigy_version: "0.1"
+metadata:
+  description: "A car with wheels"
+meshes:
+  - id: car_body
+    primitives:
+      - type: box
+        id: body
+        dimensions: { width: 2.0, height: 0.4, depth: 1.2 }
+"""
         with pytest.raises(ParseError):
-            parse_yaml(car_path)
+            parse_yaml(yaml_str)
 
 
 class TestCompositionE2E:

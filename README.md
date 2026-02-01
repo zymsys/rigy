@@ -189,13 +189,29 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 - `uniform` — rotation + translation + uniform scale
 - `affine` — full affine transform (rotation, translation, scale, shear)
 
+### v0.3 — Per-vertex weight maps
+
+**Weight maps** — Per-vertex joint influences that replace rigid per-primitive skinning with smooth deformation across bone boundaries. Defined per-primitive in `bindings[].weight_maps[]`.
+
+**Gradients** — Parametric weight blending along an axis (`x`, `y`, or `z`). A gradient linearly interpolates between a `from` and `to` bone set over a spatial range, producing smooth joint transitions without manually specifying per-vertex data. Clamped outside the range. Multiple gradients on the same primitive are applied in order (last wins).
+
+**Overrides** — Explicit vertex-index assignments that override all other weight sources for the listed vertices. Useful as an escape hatch for vertices that need hand-tuned weights.
+
+**External JSON sources** — Weight maps can reference an external `.json` file via `source`, containing per-vertex `influences` arrays. Useful for weights exported from external tools.
+
+**Resolution order** — Influences are resolved in a strict 5-layer hierarchy: default binding → per-primitive weights → external JSON → gradients → overrides. Each layer fully replaces the previous for affected vertices.
+
+**Sorting & capping** — Influences are sorted by descending weight, then ascending bone ID, then ascending bone index. Capped to 4 joints per vertex (glTF limit) with weight renormalization. Vertices with zero total weight fall back to the root bone.
+
+**Symmetry interaction** — Weight maps are expanded under mirror-X symmetry: primitive and bone IDs are renamed, X-axis gradient ranges are negated and swapped, and external JSON source paths are preserved as-is.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification and [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, and [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec.
 
 ## Development
 

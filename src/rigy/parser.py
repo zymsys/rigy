@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import yaml
@@ -116,12 +115,7 @@ def _check_version(version: str) -> None:
     except ValueError:
         raise ParseError(f"Invalid version format: {version!r}")
 
-    if major != 0:
-        raise ParseError(f"Unsupported major version: {major} (expected 0)")
-
-    if minor > 3:
-        warnings.warn(
-            f"Rigy spec version 0.{minor} is newer than supported 0.3; "
-            "some features may be unsupported",
-            stacklevel=3,
+    if (major, minor) > (0, 4):
+        raise ParseError(
+            f"Unsupported version: {version!r} (latest supported is 0.4)"
         )

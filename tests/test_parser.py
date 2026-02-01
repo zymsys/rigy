@@ -1,7 +1,5 @@
 """Tests for YAML parser."""
 
-import warnings
-
 import pytest
 
 from rigy.errors import ParseError
@@ -32,33 +30,25 @@ class TestParseYaml:
         with pytest.raises(ParseError, match="version"):
             parse_yaml("units: meters\n")
 
-    def test_unsupported_major_version(self):
-        with pytest.raises(ParseError, match="Unsupported major version"):
-            parse_yaml('version: "1.0"\nunits: meters\n')
+    def test_unsupported_version_error(self):
+        with pytest.raises(ParseError, match="Unsupported version"):
+            parse_yaml('version: "1000.0"\nunits: meters\n')
 
-    def test_newer_minor_version_warns(self):
-        yaml_str = 'version: "0.4"\nunits: meters\n'
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            parse_yaml(yaml_str)
-            assert len(w) == 1
-            assert "newer" in str(w[0].message).lower()
+    def test_unsupported_minor_version_error(self):
+        with pytest.raises(ParseError, match="Unsupported version"):
+            parse_yaml('version: "0.5"\nunits: meters\n')
 
-    def test_v03_accepted_without_warning(self):
-        yaml_str = 'version: "0.3"\nunits: meters\n'
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            spec = parse_yaml(yaml_str)
-            assert len(w) == 0
-            assert spec.version == "0.3"
+    def test_v04_accepted(self):
+        spec = parse_yaml('version: "0.4"\nunits: meters\n')
+        assert spec.version == "0.4"
 
-    def test_v02_accepted_without_warning(self):
-        yaml_str = 'version: "0.2"\nunits: meters\n'
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            spec = parse_yaml(yaml_str)
-            assert len(w) == 0
-            assert spec.version == "0.2"
+    def test_v03_accepted(self):
+        spec = parse_yaml('version: "0.3"\nunits: meters\n')
+        assert spec.version == "0.3"
+
+    def test_v02_accepted(self):
+        spec = parse_yaml('version: "0.2"\nunits: meters\n')
+        assert spec.version == "0.2"
 
     def test_invalid_version_format(self):
         with pytest.raises(ParseError, match="Invalid version"):
