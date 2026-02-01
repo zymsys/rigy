@@ -1,0 +1,28 @@
+version: "0.7"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+materials:
+  textured:
+    base_color: [1.0, 1.0, 1.0, 1.0]
+    uses_uv_roles:
+      - albedo
+      - detail
+
+meshes:
+  - id: box_mesh
+    primitives:
+      - type: box
+        id: box1
+        dimensions:
+          x: 1.0
+          y: 1.0
+          z: 1.0
+        material: textured
+    uv_roles:
+      albedo:
+        set: uv0

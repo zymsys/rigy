@@ -36,7 +36,7 @@ class TestParseYaml:
 
     def test_unsupported_minor_version_error(self):
         with pytest.raises(ParseError, match="Unsupported version"):
-            parse_yaml('version: "0.7"\nunits: meters\n')
+            parse_yaml('version: "0.8"\nunits: meters\n')
 
     def test_v05_accepted(self):
         spec = parse_yaml('version: "0.5"\nunits: meters\n')
@@ -88,6 +88,47 @@ meshes:
         assert "red" in spec.materials
         assert spec.materials["red"].base_color == [1.0, 0.0, 0.0, 1.0]
         assert spec.meshes[0].primitives[0].material == "red"
+
+    def test_v07_accepted(self):
+        spec = parse_yaml('version: "0.7"\nunits: meters\n')
+        assert spec.version == "0.7"
+
+    def test_duplicate_yaml_keys_rejected(self):
+        yaml_str = """\
+version: "0.7"
+meshes:
+  - id: m
+    uv_roles:
+      albedo:
+        set: uv0
+      albedo:
+        set: uv1
+    primitives:
+      - type: box
+        id: p
+        dimensions:
+          x: 1
+          y: 1
+          z: 1
+"""
+        with pytest.raises(ParseError, match="Invalid YAML"):
+            parse_yaml(yaml_str)
+
+    def test_duplicate_top_level_keys_rejected(self):
+        yaml_str = """\
+version: "0.7"
+units: meters
+units: meters
+"""
+        with pytest.raises(ParseError, match="Invalid YAML"):
+            parse_yaml(yaml_str)
+
+    def test_ruamel_parses_existing_specs(self, minimal_mesh_yaml):
+        """Verify ruamel.yaml migration doesn't break existing parse behavior."""
+        spec = parse_yaml(minimal_mesh_yaml)
+        assert spec.version == "0.1"
+        assert len(spec.meshes) == 1
+        assert spec.meshes[0].primitives[0].type == "box"
 
     def test_schema_error_wrapped(self):
         yaml_str = 'version: "0.1"\nmeshes:\n  - id: m\n    primitives:\n      - type: invalid_type\n        id: p\n        dimensions:\n          x: 1\n'

@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 from pydantic import ValidationError as PydanticValidationError
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from rigy.errors import ParseError
 from rigy.models import ResolvedAsset, RigySpec
+
+
+def _make_yaml() -> YAML:
+    """Create a ruamel.yaml safe loader that errors on duplicate keys."""
+    yml = YAML(typ="safe")
+    yml.allow_duplicate_keys = False
+    return yml
 
 
 def parse_yaml(source: str | Path) -> RigySpec:
@@ -31,9 +39,10 @@ def parse_yaml(source: str | Path) -> RigySpec:
     else:
         text = source
 
+    yml = _make_yaml()
     try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as e:
+        data = yml.load(text)
+    except YAMLError as e:
         raise ParseError(f"Invalid YAML: {e}") from e
 
     if not isinstance(data, dict):
@@ -115,5 +124,5 @@ def _check_version(version: str) -> None:
     except ValueError:
         raise ParseError(f"Invalid version format: {version!r}")
 
-    if (major, minor) > (0, 6):
-        raise ParseError(f"Unsupported version: {version!r} (latest supported is 0.6)")
+    if (major, minor) > (0, 7):
+        raise ParseError(f"Unsupported version: {version!r} (latest supported is 0.7)")

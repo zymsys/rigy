@@ -249,13 +249,25 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 
 **Conformance fixtures** — Three new test cases (O01–O03) covering minimal material, material with skinning, and invalid material reference.
 
+### v0.7 — UV roles & duplicate key detection
+
+**Schema-only release** — Adds UV role declarations to meshes and UV role references to materials. These are validated but have no effect on GLB output (no `TEXCOORD_n` attributes are emitted).
+
+**UV roles** — Meshes can declare `uv_roles`, a mapping from role names (`albedo`, `detail`, `directional`, `radial`, `decal`, `lightmap`) to UV set tokens (`uv0`, `uv1`, etc.). Materials can declare `uses_uv_roles` to reference roles that their assigned meshes must expose.
+
+**Validation (V43–V47)** — UV role keys must be from the normative vocabulary (V43), set tokens must match `uv<N>` format (V45), material `uses_uv_roles` entries must be from the vocabulary (V47), and materials referencing UV roles must be assigned to meshes that expose those roles (V46).
+
+**Duplicate key detection** — The YAML parser now uses `ruamel.yaml` instead of `pyyaml`, which rejects duplicate mapping keys at parse time (V44).
+
+**Conformance fixtures** — Two new test cases (P01–P02) covering UV roles with schema-only GLB output and invalid UV role references.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, and [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, and [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment.
 
 ## Development
 

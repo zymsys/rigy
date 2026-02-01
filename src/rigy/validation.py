@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import math
+import re
 import warnings
 
 from rigy.errors import ValidationError
-from rigy.models import ResolvedAsset, RigySpec
+from rigy.models import UV_ROLE_VOCABULARY, ResolvedAsset, RigySpec
 
 
 def validate(spec: RigySpec) -> None:
@@ -39,6 +40,10 @@ def validate(spec: RigySpec) -> None:
     _check_dqs_rigid_bones(spec)
     _check_pose_quaternions(spec)
     _check_pose_bone_refs(spec)
+    _check_uv_role_vocabulary(spec)
+    _check_uv_set_token_format(spec)
+    _check_material_uv_role_vocabulary(spec)
+    _check_material_uv_role_refs(spec)
     _warn_armature_root_not_at_origin(spec)
 
 
@@ -499,6 +504,76 @@ def _check_pose_bone_refs(spec: RigySpec) -> None:
         for bone_id in pose.bones:
             if bone_id not in all_bone_ids:
                 raise ValidationError(f"Pose {pose.id!r} references unknown bone: {bone_id!r}")
+
+
+_UV_SET_PATTERN = re.compile(r"^uv([0-9]+)$")
+
+
+def _check_uv_role_vocabulary(spec: RigySpec) -> None:
+    """V43: Every uv_roles key must be in UV_ROLE_VOCABULARY."""
+    for mesh in spec.meshes:
+        if mesh.uv_roles is None:
+            continue
+        for role in mesh.uv_roles:
+            if role not in UV_ROLE_VOCABULARY:
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: unknown UV role {role!r} "
+                    f"(valid: {sorted(UV_ROLE_VOCABULARY)})"
+                )
+
+
+def _check_uv_set_token_format(spec: RigySpec) -> None:
+    """V45: Each uv_roles.<role>.set must match 'uv<N>' where N >= 0."""
+    for mesh in spec.meshes:
+        if mesh.uv_roles is None:
+            continue
+        for role, entry in mesh.uv_roles.items():
+            if not _UV_SET_PATTERN.match(entry.set):
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: UV role {role!r} has invalid set token "
+                    f"{entry.set!r} (must match 'uv<N>' where N is a non-negative integer)"
+                )
+
+
+def _check_material_uv_role_vocabulary(spec: RigySpec) -> None:
+    """V47: Each material uses_uv_roles entry must be in UV_ROLE_VOCABULARY."""
+    for mat_id, mat in spec.materials.items():
+        if mat.uses_uv_roles is None:
+            continue
+        for role in mat.uses_uv_roles:
+            if role not in UV_ROLE_VOCABULARY:
+                raise ValidationError(
+                    f"Material {mat_id!r}: uses_uv_roles references unknown UV role {role!r} "
+                    f"(valid: {sorted(UV_ROLE_VOCABULARY)})"
+                )
+
+
+def _check_material_uv_role_refs(spec: RigySpec) -> None:
+    """V46: For each material with uses_uv_roles, every mesh primitive referencing
+    that material must expose all referenced roles in its mesh's uv_roles."""
+    # Build material -> set of required roles
+    mat_roles: dict[str, list[str]] = {}
+    for mat_id, mat in spec.materials.items():
+        if mat.uses_uv_roles:
+            mat_roles[mat_id] = mat.uses_uv_roles
+
+    if not mat_roles:
+        return
+
+    # For each mesh, check that primitives referencing materials with uses_uv_roles
+    # have the required roles exposed on their mesh
+    for mesh in spec.meshes:
+        mesh_uv_roles = set(mesh.uv_roles.keys()) if mesh.uv_roles else set()
+        for prim in mesh.primitives:
+            if prim.material is None or prim.material not in mat_roles:
+                continue
+            required_roles = mat_roles[prim.material]
+            for role in required_roles:
+                if role not in mesh_uv_roles:
+                    raise ValidationError(
+                        f"Mesh {mesh.id!r}: material {prim.material!r} requires "
+                        f"UV role {role!r} but mesh does not expose it in uv_roles"
+                    )
 
 
 def _warn_armature_root_not_at_origin(spec: RigySpec) -> None:

@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.6 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.7 specs."""
 
 from __future__ import annotations
 
@@ -7,6 +7,15 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+UV_ROLE_VOCABULARY: frozenset[str] = frozenset({
+    "albedo", "detail", "directional", "radial", "decal", "lightmap",
+})
+
+
+class UvRoleEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    set: str
 
 
 class CoordinateSystem(BaseModel):
@@ -46,6 +55,7 @@ class Material(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     base_color: list[float]
+    uses_uv_roles: list[str] | None = None
 
 
 class Mesh(BaseModel):
@@ -54,6 +64,7 @@ class Mesh(BaseModel):
     id: str
     name: str | None = None
     primitives: list[Primitive]
+    uv_roles: dict[str, UvRoleEntry] | None = None
 
 
 class Bone(BaseModel):

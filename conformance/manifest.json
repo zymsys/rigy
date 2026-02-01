@@ -1,6 +1,6 @@
 {
-  "version": "0.6",
-  "suite_revision": 2,
+  "version": "0.7",
+  "suite_revision": 3,
   "tests": [
     {
       "id": "I01_arm_weight_maps",
@@ -111,6 +111,23 @@
       "input": "inputs/O03_invalid_material_reference.rigy.yaml",
       "expected_error_type": "ValidationError",
       "description": "Primitive references unknown material ID (V38)"
+    },
+    {
+      "id": "P01_uv_roles_schema_only",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P01_uv_roles_schema_only.rigy.yaml",
+      "expected_output": "outputs/P01_uv_roles_schema_only.glb",
+      "expected_sha256": "e822e8f51f6a5b029e9b396d5572bdbead1048ef6e2927cf9479d80f19eb7288",
+      "description": "Mesh with uv_roles and material with uses_uv_roles — GLB identical to without (schema-only)"
+    },
+    {
+      "id": "P02_uv_role_not_exposed",
+      "category": "P",
+      "type": "negative",
+      "input": "inputs/P02_uv_role_not_exposed.rigy.yaml",
+      "expected_error_type": "ValidationError",
+      "description": "Material references UV role not exposed by mesh (V46)"
     }
   ]
 }

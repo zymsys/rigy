@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
+    "ruamel.yaml>=0.18",
     "pygltflib>=1.16",
     "numpy>=1.26",
     "click>=8.0",

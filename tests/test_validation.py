@@ -1156,3 +1156,168 @@ class TestMaterialValidation:
             ],
         )
         validate(spec)  # should not raise
+
+
+class TestUvRoleValidation:
+    def test_v43_unknown_uv_role_rejected(self):
+        from rigy.models import UvRoleEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_roles": {"unknown_role": UvRoleEntry(set="uv0")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown UV role"):
+            validate(spec)
+
+    def test_v43_valid_uv_role_passes(self):
+        from rigy.models import UvRoleEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+    def test_v45_invalid_set_token_tex0(self):
+        from rigy.models import UvRoleEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="tex0")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="invalid set token"):
+            validate(spec)
+
+    def test_v45_invalid_set_token_uv_dash(self):
+        from rigy.models import UvRoleEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv-1")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="invalid set token"):
+            validate(spec)
+
+    def test_v45_invalid_set_token_bare_uv(self):
+        from rigy.models import UvRoleEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="invalid set token"):
+            validate(spec)
+
+    def test_v45_valid_set_tokens(self):
+        from rigy.models import UvRoleEntry
+
+        for token in ["uv0", "uv1", "uv99"]:
+            spec = _make_spec(
+                meshes=[
+                    {
+                        "id": "m1",
+                        "primitives": [
+                            {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                        ],
+                        "uv_roles": {"albedo": UvRoleEntry(set=token)},
+                    }
+                ],
+            )
+            validate(spec)  # should not raise
+
+    def test_v46_material_uv_role_not_exposed(self):
+        from rigy.models import Material, UvRoleEntry
+
+        spec = _make_spec(
+            materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo", "detail"])},
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "mat1",
+                        }
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="UV role 'detail'.*does not expose"):
+            validate(spec)
+
+    def test_v46_material_uv_role_exposed_passes(self):
+        from rigy.models import Material, UvRoleEntry
+
+        spec = _make_spec(
+            materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo"])},
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "material": "mat1",
+                        }
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+    def test_v47_material_uses_unknown_uv_role(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["unknown_role"])},
+        )
+        with pytest.raises(ValidationError, match="unknown UV role"):
+            validate(spec)
+
+    def test_v47_material_uses_valid_uv_role(self):
+        from rigy.models import Material
+
+        spec = _make_spec(
+            materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo"])},
+        )
+        validate(spec)  # should not raise (no meshes, so no V46 cross-ref issue)

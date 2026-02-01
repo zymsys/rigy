@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from rigy.models import (
+    UV_ROLE_VOCABULARY,
     Anchor,
     Armature,
     Attach3,
@@ -13,6 +14,7 @@ from rigy.models import (
     CoordinateSystem,
     ImportDef,
     Instance,
+    Material,
     Mesh,
     MirrorX,
     Pose,
@@ -23,6 +25,7 @@ from rigy.models import (
     RigySpec,
     Symmetry,
     Transform,
+    UvRoleEntry,
     resolve_solver,
 )
 
@@ -438,3 +441,51 @@ class TestResolveSolver:
 
     def test_binding_dqs_over_toplevel_lbs(self):
         assert resolve_solver(self._spec("lbs"), self._binding("dqs")) == "dqs"
+
+
+class TestUvRoleEntry:
+    def test_valid(self):
+        entry = UvRoleEntry(set="uv0")
+        assert entry.set == "uv0"
+
+    def test_unknown_field_rejected(self):
+        with pytest.raises(ValidationError, match="extra"):
+            UvRoleEntry(set="uv0", channel=1)
+
+
+class TestMeshUvRoles:
+    def test_default_none(self):
+        m = Mesh(
+            id="m",
+            primitives=[Primitive(type="box", id="p", dimensions={"x": 1, "y": 1, "z": 1})],
+        )
+        assert m.uv_roles is None
+
+    def test_with_uv_roles(self):
+        m = Mesh(
+            id="m",
+            primitives=[Primitive(type="box", id="p", dimensions={"x": 1, "y": 1, "z": 1})],
+            uv_roles={"albedo": UvRoleEntry(set="uv0")},
+        )
+        assert m.uv_roles["albedo"].set == "uv0"
+
+
+class TestMaterialUsesUvRoles:
+    def test_default_none(self):
+        mat = Material(base_color=[1.0, 0.0, 0.0, 1.0])
+        assert mat.uses_uv_roles is None
+
+    def test_with_uses_uv_roles(self):
+        mat = Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo", "detail"])
+        assert mat.uses_uv_roles == ["albedo", "detail"]
+
+
+class TestUvRoleVocabulary:
+    def test_vocabulary_contents(self):
+        assert "albedo" in UV_ROLE_VOCABULARY
+        assert "detail" in UV_ROLE_VOCABULARY
+        assert "directional" in UV_ROLE_VOCABULARY
+        assert "radial" in UV_ROLE_VOCABULARY
+        assert "decal" in UV_ROLE_VOCABULARY
+        assert "lightmap" in UV_ROLE_VOCABULARY
+        assert len(UV_ROLE_VOCABULARY) == 6

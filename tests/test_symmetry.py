@@ -332,6 +332,46 @@ class TestInstanceSymmetry:
         assert mirrored.import_ == "part"
 
 
+class TestUvRoleSymmetry:
+    def test_uv_roles_preserved_after_expansion(self):
+        from rigy.models import Material, MirrorX, Symmetry, UvRoleEntry
+
+        spec = RigySpec(
+            version="0.7",
+            materials={"skin": Material(base_color=[0.8, 0.6, 0.5, 1.0])},
+            meshes=[
+                {
+                    "id": "mesh",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "legL_part",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "transform": {"translation": [0.5, 0, 0]},
+                            "material": "skin",
+                        }
+                    ],
+                    "uv_roles": {
+                        "albedo": UvRoleEntry(set="uv0"),
+                        "detail": UvRoleEntry(set="uv1"),
+                    },
+                }
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+        result = expand_symmetry(spec)
+        # uv_roles should be preserved on the mesh
+        assert result.meshes[0].uv_roles is not None
+        assert "albedo" in result.meshes[0].uv_roles
+        assert "detail" in result.meshes[0].uv_roles
+        assert result.meshes[0].uv_roles["albedo"].set == "uv0"
+        assert result.meshes[0].uv_roles["detail"].set == "uv1"
+        # Mirrored primitives should be added to the same mesh
+        prim_ids = [p.id for p in result.meshes[0].primitives]
+        assert "legL_part" in prim_ids
+        assert "legR_part" in prim_ids
+
+
 class TestMaterialSymmetry:
     def test_material_preserved_on_mirrored_primitive(self):
         from rigy.models import Material, MirrorX, Symmetry
