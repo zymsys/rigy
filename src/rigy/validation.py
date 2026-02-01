@@ -31,6 +31,7 @@ def validate(spec: RigySpec) -> None:
     _check_instance_import_refs(spec)
     _check_instance_mesh_refs(spec)
     _check_no_id_collisions(spec)
+    _check_no_nan_infinity(spec)
     _warn_armature_root_not_at_origin(spec)
 
 
@@ -340,6 +341,56 @@ def validate_composition(asset: ResolvedAsset) -> None:
                 raise ValidationError(
                     f"Instance {inst.id!r}: to anchor {ref!r} not found in local anchors"
                 )
+
+
+def _check_no_nan_infinity(spec: RigySpec) -> None:
+    """V32: Reject NaN or ±Infinity in any numeric field."""
+
+    def _check_floats(values: tuple[float, ...] | list[float], context: str) -> None:
+        for v in values:
+            if not math.isfinite(v):
+                raise ValidationError(f"Non-finite value {v} in {context}")
+
+    def _check_float(value: float, context: str) -> None:
+        if not math.isfinite(value):
+            raise ValidationError(f"Non-finite value {value} in {context}")
+
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            for key, val in prim.dimensions.items():
+                _check_float(val, f"primitive {prim.id!r} dimension {key}")
+            if prim.transform:
+                if prim.transform.translation:
+                    _check_floats(prim.transform.translation, f"primitive {prim.id!r} translation")
+                if prim.transform.rotation_euler:
+                    _check_floats(prim.transform.rotation_euler, f"primitive {prim.id!r} rotation")
+
+    for arm in spec.armatures:
+        for bone in arm.bones:
+            _check_floats(bone.head, f"bone {bone.id!r} head")
+            _check_floats(bone.tail, f"bone {bone.id!r} tail")
+            _check_float(bone.roll, f"bone {bone.id!r} roll")
+
+    for binding in spec.bindings:
+        for pw in binding.weights:
+            for bw in pw.bones:
+                _check_float(bw.weight, f"bone weight for {bw.bone_id!r}")
+        if binding.weight_maps:
+            for wm in binding.weight_maps:
+                if wm.gradients:
+                    for grad in wm.gradients:
+                        _check_floats(grad.range, "gradient range")
+                        for bw in grad.from_:
+                            _check_float(bw.weight, f"gradient from weight for {bw.bone_id!r}")
+                        for bw in grad.to:
+                            _check_float(bw.weight, f"gradient to weight for {bw.bone_id!r}")
+                if wm.overrides:
+                    for ov in wm.overrides:
+                        for bw in ov.bones:
+                            _check_float(bw.weight, f"override weight for {bw.bone_id!r}")
+
+    for anchor in spec.anchors:
+        _check_floats(anchor.translation, f"anchor {anchor.id!r} translation")
 
 
 def _warn_armature_root_not_at_origin(spec: RigySpec) -> None:

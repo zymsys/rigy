@@ -15,8 +15,8 @@ from rigy.models import Mesh, Primitive
 class MeshData:
     """Tessellated mesh geometry."""
 
-    positions: np.ndarray  # (N, 3) float32
-    normals: np.ndarray  # (N, 3) float32
+    positions: np.ndarray  # (N, 3) float64
+    normals: np.ndarray  # (N, 3) float64
     indices: np.ndarray  # (M,) uint32
 
 
@@ -69,8 +69,8 @@ def tessellate_mesh(
 
     if not all_positions:
         return MeshData(
-            positions=np.zeros((0, 3), dtype=np.float32),
-            normals=np.zeros((0, 3), dtype=np.float32),
+            positions=np.zeros((0, 3), dtype=np.float64),
+            normals=np.zeros((0, 3), dtype=np.float64),
             indices=np.zeros(0, dtype=np.uint32),
         ), prim_ranges
 
@@ -93,13 +93,13 @@ def _apply_transform(mesh_data: MeshData, primitive: Primitive) -> MeshData:
     if primitive.transform.rotation_euler is not None:
         rx, ry, rz = primitive.transform.rotation_euler
         rot = _euler_to_matrix(rx, ry, rz)
-        positions = (rot @ positions.T).T.astype(np.float32)
-        normals = (rot @ normals.T).T.astype(np.float32)
+        positions = (rot @ positions.T).T
+        normals = (rot @ normals.T).T
 
     # Then translation
     if primitive.transform.translation is not None:
         tx, ty, tz = primitive.transform.translation
-        positions = positions + np.array([tx, ty, tz], dtype=np.float32)
+        positions = positions + np.array([tx, ty, tz], dtype=np.float64)
 
     return MeshData(positions=positions, normals=normals, indices=mesh_data.indices)
 
@@ -120,9 +120,9 @@ def _euler_to_matrix(rx: float, ry: float, rz: float) -> np.ndarray:
 
 def _tessellate_box(dims: dict[str, float]) -> MeshData:
     """Box: 24 verts, 36 indices (6 faces x 4 verts, 12 tris)."""
-    hx = dims.get("x", 1.0) / 2
-    hy = dims.get("y", 1.0) / 2
-    hz = dims.get("z", 1.0) / 2
+    hx = dims.get("width", dims.get("x", 1.0)) / 2
+    hy = dims.get("height", dims.get("y", 1.0)) / 2
+    hz = dims.get("depth", dims.get("z", 1.0)) / 2
 
     # 6 faces, each with 4 vertices and a normal
     face_data = [
@@ -159,8 +159,8 @@ def _tessellate_box(dims: dict[str, float]) -> MeshData:
         indices.extend([base, base + 1, base + 2, base, base + 2, base + 3])
 
     return MeshData(
-        positions=np.array(positions, dtype=np.float32),
-        normals=np.array(normals, dtype=np.float32),
+        positions=np.array(positions, dtype=np.float64),
+        normals=np.array(normals, dtype=np.float64),
         indices=np.array(indices, dtype=np.uint32),
     )
 
@@ -203,8 +203,8 @@ def _tessellate_sphere(dims: dict[str, float]) -> MeshData:
             indices.extend([current + 1, next_row, next_row + 1])
 
     return MeshData(
-        positions=np.array(positions, dtype=np.float32),
-        normals=np.array(normals, dtype=np.float32),
+        positions=np.array(positions, dtype=np.float64),
+        normals=np.array(normals, dtype=np.float64),
         indices=np.array(indices, dtype=np.uint32),
     )
 
@@ -259,11 +259,11 @@ def _tessellate_cylinder(dims: dict[str, float]) -> MeshData:
         positions.append((radius * math.cos(angle), -half_h, radius * math.sin(angle)))
         normals.append((0, -1, 0))
     for seg in range(n_radial):
-        indices.extend([cap_center_bot, cap_start_bot + seg + 1, cap_start_bot + seg])
+        indices.extend([cap_center_bot, cap_start_bot + seg, cap_start_bot + seg + 1])
 
     return MeshData(
-        positions=np.array(positions, dtype=np.float32),
-        normals=np.array(normals, dtype=np.float32),
+        positions=np.array(positions, dtype=np.float64),
+        normals=np.array(normals, dtype=np.float64),
         indices=np.array(indices, dtype=np.uint32),
     )
 
@@ -331,7 +331,7 @@ def _tessellate_capsule(dims: dict[str, float]) -> MeshData:
             indices.extend([current + 1, next_row, next_row + 1])
 
     return MeshData(
-        positions=np.array(positions, dtype=np.float32),
-        normals=np.array(normals, dtype=np.float32),
+        positions=np.array(positions, dtype=np.float64),
+        normals=np.array(normals, dtype=np.float64),
         indices=np.array(indices, dtype=np.uint32),
     )

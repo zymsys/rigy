@@ -205,13 +205,29 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 
 **Symmetry interaction** — Weight maps are expanded under mirror-X symmetry: primitive and bone IDs are renamed, X-axis gradient ranges are negated and swapped, and external JSON source paths are preserved as-is.
 
+### v0.4 — Determinism, conformance, and correctness
+
+**Formalization release** — No new authoring constructs. Strengthens determinism guarantees and establishes a normative conformance suite.
+
+**Float64 intermediate precision** — All intermediate arithmetic uses IEEE 754 float64. Truncation to float32 occurs only at the GLB serialization boundary, ensuring byte-identical output across implementations.
+
+**Conformance suite** — Canonical input/output pairs under `conformance/` with SHA-256 hashes in `conformance/manifest.json`. The test runner (`tests/test_conformance.py`) verifies byte-identical GLB output.
+
+**V32 validation** — NaN and ±Infinity values in any numeric field (dimensions, transforms, bone positions, weights) are now a hard error.
+
+**`skinning_solver` field** — Reserved extension point. Only `"lbs"` (Linear Blend Skinning) is valid in v0.4; defaults to `"lbs"` when absent.
+
+**Box dimension keys** — Boxes now accept `width`/`height`/`depth` in addition to `x`/`y`/`z`.
+
+**Cylinder winding fix** — Bottom cap triangle winding corrected to match the normative spec pseudocode.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, and [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, and [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec.
 
 ## Development
 

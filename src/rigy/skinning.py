@@ -18,8 +18,8 @@ class SkinData:
     """Skinning data ready for glTF export."""
 
     joints: np.ndarray  # (N, 4) uint16
-    weights: np.ndarray  # (N, 4) float32
-    inverse_bind_matrices: np.ndarray  # (J, 4, 4) float32
+    weights: np.ndarray  # (N, 4) float64
+    inverse_bind_matrices: np.ndarray  # (J, 4, 4) float64
     joint_names: list[str]
 
 
@@ -119,7 +119,7 @@ def compute_skinning(
 
     # Final pass: sort, cap to 4, normalize
     joints = np.zeros((total_vertices, 4), dtype=np.uint16)
-    weights = np.zeros((total_vertices, 4), dtype=np.float32)
+    weights = np.zeros((total_vertices, 4), dtype=np.float64)
 
     for v in range(total_vertices):
         bone_weights = influences.get(v, [(root_bone_idx, 1.0)])
@@ -282,11 +282,11 @@ def _compute_inverse_bind_matrices(bones: list[Bone]) -> np.ndarray:
     The IBM is the inverse: translate(-bone.head).
     """
     n = len(bones)
-    ibms = np.zeros((n, 4, 4), dtype=np.float32)
+    ibms = np.zeros((n, 4, 4), dtype=np.float64)
 
     for i, bone in enumerate(bones):
         # IBM = inverse of world-space translation to bone head
-        mat = np.eye(4, dtype=np.float32)
+        mat = np.eye(4, dtype=np.float64)
         mat[0, 3] = -float(bone.head[0])
         mat[1, 3] = -float(bone.head[1])
         mat[2, 3] = -float(bone.head[2])

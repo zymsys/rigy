@@ -249,6 +249,7 @@ class RigySpec(BaseModel):
     armatures: list[Armature] = []
     bindings: list[Binding] = []
     symmetry: Symmetry | None = None
+    skinning_solver: Literal["lbs"] | None = None
     # v0.2 fields
     anchors: list[Anchor] = []
     imports: dict[str, ImportDef] = {}

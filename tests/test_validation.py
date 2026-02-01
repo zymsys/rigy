@@ -744,3 +744,105 @@ class TestValidation:
             armature_warnings = [x for x in w if "root bone" in str(x.message)]
             assert len(armature_warnings) == 1
             assert "a1" in str(armature_warnings[0].message)
+
+    # --- V32: NaN / ±Infinity check ---
+
+    def test_nan_in_primitive_dimensions(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "sphere", "id": "p1", "dimensions": {"radius": float("nan")}}
+                    ],
+                }
+            ]
+        )
+        with pytest.raises(ValidationError, match="Non-finite"):
+            validate(spec)
+
+    def test_infinity_in_bone_head(self):
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {
+                            "id": "root",
+                            "parent": "none",
+                            "head": [float("inf"), 0, 0],
+                            "tail": [0, 1, 0],
+                        }
+                    ],
+                }
+            ]
+        )
+        with pytest.raises(ValidationError, match="Non-finite"):
+            validate(spec)
+
+    def test_neg_infinity_in_translation(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "transform": {"translation": [0, float("-inf"), 0]},
+                        }
+                    ],
+                }
+            ]
+        )
+        with pytest.raises(ValidationError, match="Non-finite"):
+            validate(spec)
+
+    def test_nan_in_bone_weight(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            bindings=[
+                {
+                    "mesh_id": "m1",
+                    "armature_id": "a1",
+                    "weights": [
+                        {
+                            "primitive_id": "p1",
+                            "bones": [{"bone_id": "root", "weight": float("nan")}],
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="Non-finite"):
+            validate(spec)
+
+    def test_finite_values_pass(self):
+        """All finite values should pass V32."""
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ]
+        )
+        validate(spec)  # should not raise

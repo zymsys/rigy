@@ -39,7 +39,7 @@ Orchestrated in `cli.py`, each stage has a dedicated module in `src/rigy/`:
 - **Determinism**: Same YAML must produce byte-identical GLB. Tests verify this.
 - **Coordinate system**: glTF 2.0 aligned — Y-up, -Z forward, right-handed, meters.
 - **Transforms**: Rotation (Euler XYZ) applied before translation. Normals rotated but not translated.
-- **Spec version**: v0.1. Parser rejects major != 0, warns on minor > 1. v0.2 fields (imports, anchors, instances, attach3) are intentionally rejected.
+- **Spec version**: v0.1–v0.4. Parser accepts versions 0.1 through 0.4, rejects major ≥ 1. v0.4 adds `skinning_solver` field, V32 NaN/Infinity check, float64 intermediate precision, and a normative conformance suite under `conformance/`.
 
 ## Test patterns
 

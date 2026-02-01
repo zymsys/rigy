@@ -203,6 +203,24 @@ class TestRigySpec:
         assert spec.anchors[0].id == "a1"
 
 
+class TestSkinningSolver:
+    def test_lbs_accepted(self):
+        spec = RigySpec(version="0.4", skinning_solver="lbs")
+        assert spec.skinning_solver == "lbs"
+
+    def test_absent_defaults_to_none(self):
+        spec = RigySpec(version="0.4")
+        assert spec.skinning_solver is None
+
+    def test_dqs_rejected(self):
+        with pytest.raises(ValidationError):
+            RigySpec(version="0.4", skinning_solver="dqs")
+
+    def test_invalid_value_rejected(self):
+        with pytest.raises(ValidationError):
+            RigySpec(version="0.4", skinning_solver="invalid")
+
+
 class TestAnchor:
     def test_valid(self):
         a = Anchor(id="mount_a", translation=(0, 0, 0))

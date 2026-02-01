@@ -1,0 +1,24 @@
+{
+  "version": "0.4",
+  "suite_revision": 1,
+  "tests": [
+    {
+      "id": "I01_arm_weight_maps",
+      "category": "I",
+      "type": "positive",
+      "input": "inputs/I01_arm_weight_maps.rigy.yaml",
+      "expected_output": "outputs/I01_arm_weight_maps.glb",
+      "expected_sha256": "01664a344cf0aa4e9c944bda433c56a37625184739285adad765f1acb08de1a4",
+      "description": "Per-vertex weight maps with gradient influence resolution"
+    },
+    {
+      "id": "E01_humanoid",
+      "category": "E",
+      "type": "positive",
+      "input": "inputs/E01_humanoid.rigy.yaml",
+      "expected_output": "outputs/E01_humanoid.glb",
+      "expected_sha256": "ce3d9227eaad36cbf6feaee183ce23662d69f0337647319a82c72102dd9a8c46",
+      "description": "Humanoid with armature hierarchy, symmetry, and deterministic export"
+    }
+  ]
+}

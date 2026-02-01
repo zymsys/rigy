@@ -1,0 +1,88 @@
+version: "0.4"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+meshes:
+- id: arm_mesh
+  primitives:
+  - type: capsule
+    id: upper_arm
+    dimensions:
+      radius: 0.05
+      height: 0.25
+    transform:
+      translation:
+      - 0
+      - 1.0
+      - 0
+  - type: capsule
+    id: forearm
+    dimensions:
+      radius: 0.04
+      height: 0.25
+    transform:
+      translation:
+      - 0
+      - 0.65
+      - 0
+armatures:
+- id: arm_armature
+  bones:
+  - id: shoulder
+    parent: none
+    head:
+    - 0
+    - 1.15
+    - 0
+    tail:
+    - 0
+    - 0.9
+    - 0
+  - id: elbow
+    parent: shoulder
+    head:
+    - 0
+    - 0.9
+    - 0
+    tail:
+    - 0
+    - 0.65
+    - 0
+  - id: wrist
+    parent: elbow
+    head:
+    - 0
+    - 0.65
+    - 0
+    tail:
+    - 0
+    - 0.5
+    - 0
+bindings:
+- mesh_id: arm_mesh
+  armature_id: arm_armature
+  weights:
+  - primitive_id: upper_arm
+    bones:
+    - bone_id: shoulder
+      weight: 1.0
+  - primitive_id: forearm
+    bones:
+    - bone_id: elbow
+      weight: 1.0
+  weight_maps:
+  - primitive_id: upper_arm
+    gradients:
+    - axis: y
+      range:
+      - 0.88
+      - 1.02
+      from:
+      - bone_id: elbow
+        weight: 1.0
+      to:
+      - bone_id: shoulder
+        weight: 1.0
