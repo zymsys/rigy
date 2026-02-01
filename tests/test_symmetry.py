@@ -129,6 +129,144 @@ class TestAnchorSymmetry:
         assert len(result.anchors) == 1
 
 
+class TestWeightMapSymmetry:
+    def _make_spec_with_wm(self):
+        from rigy.models import (
+            Binding,
+            BoneWeight,
+            Gradient,
+            MirrorX,
+            Symmetry,
+            VertexOverride,
+            WeightMap,
+        )
+
+        return RigySpec(
+            version="0.3",
+            meshes=[
+                {
+                    "id": "legL_mesh",
+                    "primitives": [
+                        {"type": "box", "id": "legL_prim", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "arm",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]},
+                        {"id": "legL_bone", "parent": "root", "head": [0.5, 0, 0], "tail": [0.5, -1, 0]},
+                    ],
+                }
+            ],
+            bindings=[
+                Binding(
+                    mesh_id="legL_mesh",
+                    armature_id="arm",
+                    weights=[],
+                    weight_maps=[
+                        WeightMap(
+                            primitive_id="legL_prim",
+                            gradients=[
+                                Gradient(
+                                    axis="x",
+                                    range=(0.2, 0.8),
+                                    from_=[BoneWeight(bone_id="root", weight=1.0)],
+                                    to=[BoneWeight(bone_id="legL_bone", weight=1.0)],
+                                ),
+                                Gradient(
+                                    axis="y",
+                                    range=(0.0, 1.0),
+                                    from_=[BoneWeight(bone_id="root", weight=1.0)],
+                                    to=[BoneWeight(bone_id="legL_bone", weight=1.0)],
+                                ),
+                            ],
+                            overrides=[
+                                VertexOverride(
+                                    vertices=[0, 1],
+                                    bones=[BoneWeight(bone_id="legL_bone", weight=1.0)],
+                                )
+                            ],
+                            source="weights.json",
+                        )
+                    ],
+                )
+            ],
+            symmetry=Symmetry(mirror_x=MirrorX(prefix_from="legL_", prefix_to="legR_")),
+        )
+
+    def test_wm_primitive_id_renamed(self):
+        spec = self._make_spec_with_wm()
+        result = expand_symmetry(spec)
+        wm_ids = [wm.primitive_id for b in result.bindings for wm in (b.weight_maps or [])]
+        assert "legL_prim" in wm_ids
+        assert "legR_prim" in wm_ids
+
+    def test_wm_bone_ids_renamed(self):
+        spec = self._make_spec_with_wm()
+        result = expand_symmetry(spec)
+        mirrored_wms = [
+            wm for b in result.bindings for wm in (b.weight_maps or [])
+            if wm.primitive_id == "legR_prim"
+        ]
+        assert len(mirrored_wms) == 1
+        wm = mirrored_wms[0]
+        # Check gradient bone_ids
+        for grad in wm.gradients:
+            bone_ids = [bw.bone_id for bw in grad.from_] + [bw.bone_id for bw in grad.to]
+            for bid in bone_ids:
+                assert "legL_" not in bid
+
+        # Check override bone_ids
+        for ov in wm.overrides:
+            for bw in ov.bones:
+                assert bw.bone_id == "legR_bone"
+
+    def test_x_axis_gradient_range_inverted_and_swapped(self):
+        spec = self._make_spec_with_wm()
+        result = expand_symmetry(spec)
+        mirrored_wm = [
+            wm for b in result.bindings for wm in (b.weight_maps or [])
+            if wm.primitive_id == "legR_prim"
+        ][0]
+        x_grad = [g for g in mirrored_wm.gradients if g.axis == "x"][0]
+        # Original range (0.2, 0.8) -> inverted (-0.8, -0.2)
+        assert x_grad.range == (-0.8, -0.2)
+        # from/to swapped: original from=root, to=legL_bone
+        # mirrored: from=legR_bone, to=root
+        assert x_grad.from_[0].bone_id == "legR_bone"
+        assert x_grad.to[0].bone_id == "root"
+
+    def test_y_axis_gradient_unchanged(self):
+        spec = self._make_spec_with_wm()
+        result = expand_symmetry(spec)
+        mirrored_wm = [
+            wm for b in result.bindings for wm in (b.weight_maps or [])
+            if wm.primitive_id == "legR_prim"
+        ][0]
+        y_grad = [g for g in mirrored_wm.gradients if g.axis == "y"][0]
+        assert y_grad.range == (0.0, 1.0)
+
+    def test_override_vertices_preserved(self):
+        spec = self._make_spec_with_wm()
+        result = expand_symmetry(spec)
+        mirrored_wm = [
+            wm for b in result.bindings for wm in (b.weight_maps or [])
+            if wm.primitive_id == "legR_prim"
+        ][0]
+        assert mirrored_wm.overrides[0].vertices == [0, 1]
+
+    def test_source_path_not_mirrored(self):
+        spec = self._make_spec_with_wm()
+        result = expand_symmetry(spec)
+        mirrored_wm = [
+            wm for b in result.bindings for wm in (b.weight_maps or [])
+            if wm.primitive_id == "legR_prim"
+        ][0]
+        assert mirrored_wm.source == "weights.json"
+
+
 class TestInstanceSymmetry:
     def test_instances_mirrored(self):
         from rigy.models import Anchor, Attach3, ImportDef, Instance, MirrorX, Symmetry

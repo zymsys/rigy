@@ -23,6 +23,7 @@ def validate(spec: RigySpec) -> None:
     _check_no_zero_length_bones(spec)
     _check_primitive_dimensions_positive(spec)
     _check_binding_refs(spec)
+    _check_weight_map_refs(spec)
     _check_mesh_single_binding(spec)
     _check_weights_in_range(spec)
     _check_unique_anchor_ids(spec)
@@ -136,6 +137,78 @@ def _check_binding_refs(spec: RigySpec) -> None:
             for bw in pw.bones:
                 if bw.bone_id not in bone_ids:
                     raise ValidationError(f"Binding references unknown bone: {bw.bone_id!r}")
+
+
+def _check_weight_map_refs(spec: RigySpec) -> None:
+    """Validate weight_maps references: primitive_id, bone_ids, weight ranges."""
+    # Build primitive id sets per mesh
+    prim_ids_by_mesh: dict[str, set[str]] = {}
+    for mesh in spec.meshes:
+        prim_ids_by_mesh[mesh.id] = {p.id for p in mesh.primitives}
+
+    # Build bone id sets per armature
+    bone_ids_by_arm: dict[str, set[str]] = {}
+    for arm in spec.armatures:
+        bone_ids_by_arm[arm.id] = {b.id for b in arm.bones}
+
+    for binding in spec.bindings:
+        if not binding.weight_maps:
+            continue
+
+        prim_ids = prim_ids_by_mesh.get(binding.mesh_id, set())
+        bone_ids = bone_ids_by_arm.get(binding.armature_id, set())
+
+        # Check for pw + wm overlap and warn
+        pw_prim_ids = {pw.primitive_id for pw in binding.weights}
+
+        for wm in binding.weight_maps:
+            if wm.primitive_id not in prim_ids:
+                raise ValidationError(
+                    f"Weight map references unknown primitive: {wm.primitive_id!r}"
+                )
+
+            if wm.primitive_id in pw_prim_ids:
+                warnings.warn(
+                    f"Primitive {wm.primitive_id!r} has both per-primitive weights "
+                    f"and a weight map; weight map layers will override",
+                    stacklevel=2,
+                )
+
+            if wm.gradients:
+                for grad in wm.gradients:
+                    for bw in grad.from_:
+                        if bw.bone_id not in bone_ids:
+                            raise ValidationError(
+                                f"Weight map gradient references unknown bone: {bw.bone_id!r}"
+                            )
+                        if bw.weight < 0.0 or bw.weight > 1.0:
+                            raise ValidationError(
+                                f"Weight {bw.weight} for bone {bw.bone_id!r} in gradient "
+                                f"is out of range [0, 1]"
+                            )
+                    for bw in grad.to:
+                        if bw.bone_id not in bone_ids:
+                            raise ValidationError(
+                                f"Weight map gradient references unknown bone: {bw.bone_id!r}"
+                            )
+                        if bw.weight < 0.0 or bw.weight > 1.0:
+                            raise ValidationError(
+                                f"Weight {bw.weight} for bone {bw.bone_id!r} in gradient "
+                                f"is out of range [0, 1]"
+                            )
+
+            if wm.overrides:
+                for ov in wm.overrides:
+                    for bw in ov.bones:
+                        if bw.bone_id not in bone_ids:
+                            raise ValidationError(
+                                f"Weight map override references unknown bone: {bw.bone_id!r}"
+                            )
+                        if bw.weight < 0.0 or bw.weight > 1.0:
+                            raise ValidationError(
+                                f"Weight {bw.weight} for bone {bw.bone_id!r} in override "
+                                f"is out of range [0, 1]"
+                            )
 
 
 def _check_mesh_single_binding(spec: RigySpec) -> None:

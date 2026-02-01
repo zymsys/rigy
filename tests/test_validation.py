@@ -522,6 +522,211 @@ class TestValidation:
             armature_warnings = [x for x in w if "armature root" in str(x.message).lower()]
             assert len(armature_warnings) == 0
 
+    # --- v0.3 weight map validation tests ---
+
+    def test_weight_map_unknown_primitive(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            bindings=[
+                {
+                    "mesh_id": "m1",
+                    "armature_id": "a1",
+                    "weights": [],
+                    "weight_maps": [
+                        {
+                            "primitive_id": "nonexistent",
+                            "overrides": [
+                                {"vertices": [0], "bones": [{"bone_id": "root", "weight": 1.0}]}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown primitive"):
+            validate(spec)
+
+    def test_weight_map_unknown_bone_in_gradient(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            bindings=[
+                {
+                    "mesh_id": "m1",
+                    "armature_id": "a1",
+                    "weights": [],
+                    "weight_maps": [
+                        {
+                            "primitive_id": "p1",
+                            "gradients": [
+                                {
+                                    "axis": "y",
+                                    "range": [0, 1],
+                                    "from": [{"bone_id": "bad_bone", "weight": 1.0}],
+                                    "to": [{"bone_id": "root", "weight": 1.0}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown bone"):
+            validate(spec)
+
+    def test_weight_map_unknown_bone_in_override(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            bindings=[
+                {
+                    "mesh_id": "m1",
+                    "armature_id": "a1",
+                    "weights": [],
+                    "weight_maps": [
+                        {
+                            "primitive_id": "p1",
+                            "overrides": [
+                                {
+                                    "vertices": [0],
+                                    "bones": [{"bone_id": "nonexistent", "weight": 1.0}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown bone"):
+            validate(spec)
+
+    def test_weight_map_negative_weight_in_gradient(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            bindings=[
+                {
+                    "mesh_id": "m1",
+                    "armature_id": "a1",
+                    "weights": [],
+                    "weight_maps": [
+                        {
+                            "primitive_id": "p1",
+                            "gradients": [
+                                {
+                                    "axis": "y",
+                                    "range": [0, 1],
+                                    "from": [{"bone_id": "root", "weight": -0.5}],
+                                    "to": [{"bone_id": "root", "weight": 1.0}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="out of range"):
+            validate(spec)
+
+    def test_weight_map_valid_passes(self):
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                }
+            ],
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]},
+                        {"id": "child", "parent": "root", "head": [0, 1, 0], "tail": [0, 2, 0]},
+                    ],
+                }
+            ],
+            bindings=[
+                {
+                    "mesh_id": "m1",
+                    "armature_id": "a1",
+                    "weights": [],
+                    "weight_maps": [
+                        {
+                            "primitive_id": "p1",
+                            "gradients": [
+                                {
+                                    "axis": "y",
+                                    "range": [0, 1],
+                                    "from": [{"bone_id": "root", "weight": 1.0}],
+                                    "to": [{"bone_id": "child", "weight": 1.0}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
     def test_armature_root_not_at_origin_warns(self):
         spec = _make_spec(
             armatures=[

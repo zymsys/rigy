@@ -14,16 +14,21 @@ from rigy.skinning import SkinData, compute_skinning
 from rigy.tessellation import tessellate_mesh
 
 
-def export_gltf(spec_or_composed: RigySpec | ComposedAsset, output_path: Path) -> None:
+def export_gltf(
+    spec_or_composed: RigySpec | ComposedAsset,
+    output_path: Path,
+    *,
+    yaml_dir: Path | None = None,
+) -> None:
     """Export a validated Rigy spec or composed asset to a GLB file.
 
     Pipeline: tessellate -> skin -> build glTF scene -> write GLB.
     """
     try:
         if isinstance(spec_or_composed, ComposedAsset):
-            gltf = _build_gltf_composed(spec_or_composed)
+            gltf = _build_gltf_composed(spec_or_composed, yaml_dir=yaml_dir)
         else:
-            gltf = _build_gltf(spec_or_composed)
+            gltf = _build_gltf(spec_or_composed, yaml_dir=yaml_dir)
         gltf.save(str(output_path))
     except Exception as e:
         if isinstance(e, ExportError):
@@ -31,7 +36,7 @@ def export_gltf(spec_or_composed: RigySpec | ComposedAsset, output_path: Path) -
         raise ExportError(f"Failed to export glTF: {e}") from e
 
 
-def _build_gltf_composed(composed: ComposedAsset) -> pygltflib.GLTF2:
+def _build_gltf_composed(composed: ComposedAsset, *, yaml_dir: Path | None = None) -> pygltflib.GLTF2:
     """Build the complete glTF2 structure for a composed asset."""
     gltf = pygltflib.GLTF2(
         scene=0,
@@ -52,7 +57,7 @@ def _build_gltf_composed(composed: ComposedAsset) -> pygltflib.GLTF2:
     # Build root asset meshes (same as v0.1) and track mesh_id -> glTF mesh index
     mesh_id_to_gltf_idx: dict[str, int] = {}
     pre_count = len(gltf.meshes)
-    _build_spec_meshes(gltf, composed.root_spec, blob_data, material_map, scene_nodes)
+    _build_spec_meshes(gltf, composed.root_spec, blob_data, material_map, scene_nodes, yaml_dir=yaml_dir)
     for i, mesh_def in enumerate(composed.root_spec.meshes):
         mesh_id_to_gltf_idx[mesh_def.id] = pre_count + i
 
@@ -134,7 +139,7 @@ def _build_local_mesh_instance(
     scene_nodes.append(node_idx)
 
 
-def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
+def _build_gltf(spec: RigySpec, *, yaml_dir: Path | None = None) -> pygltflib.GLTF2:
     """Build the complete glTF2 structure (v0.1 path)."""
     gltf = pygltflib.GLTF2(
         scene=0,
@@ -152,7 +157,7 @@ def _build_gltf(spec: RigySpec) -> pygltflib.GLTF2:
     material_map: dict[str, int] = {}
     scene_nodes: list[int] = []
 
-    _build_spec_meshes(gltf, spec, blob_data, material_map, scene_nodes)
+    _build_spec_meshes(gltf, spec, blob_data, material_map, scene_nodes, yaml_dir=yaml_dir)
 
     gltf.scenes[0].nodes = scene_nodes
 
@@ -170,6 +175,8 @@ def _build_spec_meshes(
     material_map: dict[str, int],
     scene_nodes: list[int],
     name_prefix: str = "",
+    *,
+    yaml_dir: Path | None = None,
 ) -> None:
     """Build mesh/bone/skin nodes for a spec and append to scene_nodes."""
     # Build binding lookup
@@ -289,7 +296,10 @@ def _build_spec_meshes(
         skin_data: SkinData | None = None
         if mesh_def.id in binding_map:
             binding, armature = binding_map[mesh_def.id]
-            skin_data = compute_skinning(binding, armature, prim_ranges, len(mesh_data.positions))
+            skin_data = compute_skinning(
+                binding, armature, prim_ranges, len(mesh_data.positions),
+                positions=mesh_data.positions, yaml_dir=yaml_dir,
+            )
 
             # Write joints
             joints_offset = len(blob_data)

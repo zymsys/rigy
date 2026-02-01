@@ -8,11 +8,14 @@ from rigy.models import (
     Anchor,
     Bone,
     BoneWeight,
+    Gradient,
     Instance,
     Primitive,
     PrimitiveWeights,
     RigySpec,
     Transform,
+    VertexOverride,
+    WeightMap,
 )
 
 
@@ -57,6 +60,14 @@ def expand_symmetry(spec: RigySpec) -> RigySpec:
                 mirrored = _mirror_primitive_weights(pw, prefix_from, prefix_to)
                 new_weights.append(mirrored)
         binding.weights.extend(new_weights)
+
+        # Expand weight maps
+        if binding.weight_maps:
+            new_wms: list[WeightMap] = []
+            for wm in binding.weight_maps:
+                if wm.primitive_id.startswith(prefix_from):
+                    new_wms.append(_mirror_weight_map(wm, prefix_from, prefix_to))
+            binding.weight_maps = list(binding.weight_maps) + new_wms
 
     # Expand anchors
     new_anchors: list[Anchor] = []
@@ -149,6 +160,59 @@ def _mirror_anchor(anchor: Anchor, prefix_from: str, prefix_to: str) -> Anchor:
         id=new_id,
         translation=(-tx, ty, tz),
         scope=anchor.scope,
+    )
+
+
+def _mirror_weight_map(wm: WeightMap, prefix_from: str, prefix_to: str) -> WeightMap:
+    """Create a mirrored copy of a weight map."""
+    new_prim_id = _rename(wm.primitive_id, prefix_from, prefix_to)
+
+    new_gradients = None
+    if wm.gradients:
+        new_gradients = []
+        for grad in wm.gradients:
+            new_from = [
+                BoneWeight(bone_id=_rename(bw.bone_id, prefix_from, prefix_to), weight=bw.weight)
+                for bw in grad.from_
+            ]
+            new_to = [
+                BoneWeight(bone_id=_rename(bw.bone_id, prefix_from, prefix_to), weight=bw.weight)
+                for bw in grad.to
+            ]
+
+            if grad.axis == "x":
+                # Invert range and swap from/to
+                a, b = grad.range
+                new_range = (-b, -a)
+                new_gradients.append(
+                    Gradient(from_=new_to, to=new_from, axis="x", range=new_range)
+                )
+            else:
+                new_gradients.append(
+                    Gradient(from_=new_from, to=new_to, axis=grad.axis, range=grad.range)
+                )
+
+    new_overrides = None
+    if wm.overrides:
+        new_overrides = [
+            VertexOverride(
+                vertices=list(ov.vertices),
+                bones=[
+                    BoneWeight(
+                        bone_id=_rename(bw.bone_id, prefix_from, prefix_to),
+                        weight=bw.weight,
+                    )
+                    for bw in ov.bones
+                ],
+            )
+            for ov in wm.overrides
+        ]
+
+    return WeightMap(
+        primitive_id=new_prim_id,
+        gradients=new_gradients,
+        overrides=new_overrides,
+        source=wm.source,  # NOT mirrored per spec
     )
 
 

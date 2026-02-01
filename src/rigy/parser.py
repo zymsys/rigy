@@ -119,9 +119,9 @@ def _check_version(version: str) -> None:
     if major != 0:
         raise ParseError(f"Unsupported major version: {major} (expected 0)")
 
-    if minor > 2:
+    if minor > 3:
         warnings.warn(
-            f"Rigy spec version 0.{minor} is newer than supported 0.2; "
+            f"Rigy spec version 0.{minor} is newer than supported 0.3; "
             "some features may be unsupported",
             stacklevel=3,
         )

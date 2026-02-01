@@ -63,7 +63,7 @@ def compile(input_file: Path, output: Path | None, bake_transforms: bool = False
         composed = resolve_composition(asset)
         if bake_transforms:
             composed = _bake_transforms(composed)
-        export_gltf(composed, output)
+        export_gltf(composed, output, yaml_dir=input_file.parent)
         click.echo(f"Compiled: {output}")
     except RigyError as e:
         raise click.ClickException(str(e))

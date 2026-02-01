@@ -82,12 +82,77 @@ class PrimitiveWeights(BaseModel):
     bones: list[BoneWeight]
 
 
+class Gradient(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    axis: Literal["x", "y", "z"]
+    range: tuple[float, float]
+    from_: list[BoneWeight] = Field(alias="from")
+    to: list[BoneWeight]
+
+    @field_validator("range")
+    @classmethod
+    def range_ascending(cls, v: tuple[float, float]) -> tuple[float, float]:
+        if v[0] >= v[1]:
+            raise ValueError(f"Gradient range[0] must be < range[1], got {v}")
+        return v
+
+    @field_validator("from_", mode="before")
+    @classmethod
+    def normalize_from(cls, v: object) -> list[object]:
+        if isinstance(v, dict):
+            return [v]
+        if isinstance(v, BoneWeight):
+            return [v]
+        return v
+
+    @field_validator("to", mode="before")
+    @classmethod
+    def normalize_to(cls, v: object) -> list[object]:
+        if isinstance(v, dict):
+            return [v]
+        if isinstance(v, BoneWeight):
+            return [v]
+        return v
+
+
+class VertexOverride(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vertices: list[int]
+    bones: list[BoneWeight]
+
+    @field_validator("vertices")
+    @classmethod
+    def vertices_non_negative(cls, v: list[int]) -> list[int]:
+        for idx in v:
+            if idx < 0:
+                raise ValueError(f"Vertex index must be >= 0, got {idx}")
+        return v
+
+
+class WeightMap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    primitive_id: str
+    gradients: list[Gradient] | None = None
+    overrides: list[VertexOverride] | None = None
+    source: str | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_strategy(self) -> WeightMap:
+        if not self.gradients and not self.overrides and not self.source:
+            raise ValueError("WeightMap must have at least one of: gradients, overrides, source")
+        return self
+
+
 class Binding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mesh_id: str
     armature_id: str
     weights: list[PrimitiveWeights]
+    weight_maps: list[WeightMap] | None = None
 
 
 class MirrorX(BaseModel):
