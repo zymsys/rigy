@@ -11,7 +11,7 @@ import pytest
 from numpy.testing import assert_allclose
 from pydantic import ValidationError as PydanticValidationError
 
-from rigy.errors import ExportError
+from rigy.errors import ValidationError
 from rigy.models import (
     Armature,
     Binding,
@@ -411,7 +411,7 @@ class TestSkinningOverrides:
             ],
         )
         prim_ranges = {"p1": (0, 3)}
-        with pytest.raises(ExportError, match="out of bounds"):
+        with pytest.raises(ValidationError, match="out of bounds"):
             compute_skinning(binding, arm, prim_ranges, 3)
 
 
@@ -421,7 +421,7 @@ class TestSkinningExternalJSON:
         json_data = {
             "primitive_id": "p1",
             "vertex_count": 3,
-            "weights": [
+            "influences": [
                 {"vertex": 0, "bones": [{"bone_id": "tip", "weight": 1.0}]},
                 {"vertex": 2, "bones": [{"bone_id": "mid", "weight": 0.5}, {"bone_id": "tip", "weight": 0.5}]},
             ],
@@ -448,7 +448,7 @@ class TestSkinningExternalJSON:
 
     def test_external_vertex_count_mismatch(self, tmp_path):
         arm = _arm_with_3_bones()
-        json_data = {"primitive_id": "p1", "vertex_count": 999, "weights": []}
+        json_data = {"primitive_id": "p1", "vertex_count": 999, "influences": []}
         json_path = tmp_path / "weights.json"
         json_path.write_text(json.dumps(json_data))
 
@@ -459,7 +459,7 @@ class TestSkinningExternalJSON:
             weight_maps=[WeightMap(primitive_id="p1", source="weights.json")],
         )
         prim_ranges = {"p1": (0, 3)}
-        with pytest.raises(ExportError, match="vertex_count mismatch"):
+        with pytest.raises(ValidationError, match="vertex_count mismatch"):
             compute_skinning(binding, arm, prim_ranges, 3, yaml_dir=tmp_path)
 
 

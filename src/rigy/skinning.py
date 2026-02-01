@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from rigy.errors import ExportError
+from rigy.errors import ExportError, ValidationError
 from rigy.models import Armature, Binding, Bone, Gradient
 
 
@@ -95,6 +95,7 @@ def compute_skinning(
                 for grad in wm.gradients:
                     grad_influences = _evaluate_gradient(
                         grad, positions, bone_index, start, end,
+                        root_bone_idx=root_bone_idx,
                     )
                     for v, bws in grad_influences.items():
                         influences[v] = bws
@@ -109,7 +110,7 @@ def compute_skinning(
                     for local_v in ov.vertices:
                         abs_v = start + local_v
                         if abs_v >= end:
-                            raise ExportError(
+                            raise ValidationError(
                                 f"Override vertex index {local_v} out of bounds for "
                                 f"primitive {wm.primitive_id!r} "
                                 f"(vertex count: {end - start})"
@@ -182,34 +183,34 @@ def _load_external_weights(
         Map of local vertex index -> [(bone_idx, weight), ...]
     """
     if yaml_dir is None:
-        raise ExportError(
+        raise ValidationError(
             f"External weight source {source!r} specified but no yaml_dir available"
         )
 
     json_path = yaml_dir / source
     if not json_path.exists():
-        raise ExportError(f"External weight file not found: {json_path}")
+        raise ValidationError(f"External weight file not found: {json_path}")
 
     try:
         data = json.loads(json_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
-        raise ExportError(f"Failed to load external weights from {json_path}: {e}") from e
+        raise ValidationError(f"Failed to load external weights from {json_path}: {e}") from e
 
     if data.get("primitive_id") != primitive_id:
-        raise ExportError(
+        raise ValidationError(
             f"External weight file {source!r}: primitive_id mismatch "
             f"(expected {primitive_id!r}, got {data.get('primitive_id')!r})"
         )
 
     file_vc = data.get("vertex_count")
     if file_vc != vertex_count:
-        raise ExportError(
+        raise ValidationError(
             f"External weight file {source!r}: vertex_count mismatch "
             f"(expected {vertex_count}, got {file_vc})"
         )
 
     result: dict[int, list[tuple[int, float]]] = {}
-    for entry in data.get("weights", []):
+    for entry in data.get("influences", []):
         vi = entry["vertex"]
         bws = []
         for bw in entry["bones"]:
@@ -227,6 +228,7 @@ def _evaluate_gradient(
     bone_index: dict[str, int],
     start: int,
     end: int,
+    root_bone_idx: int = 0,
 ) -> dict[int, list[tuple[int, float]]]:
     """Evaluate a gradient across vertices in [start, end).
 
@@ -267,14 +269,9 @@ def _evaluate_gradient(
         if bws:
             result[v] = bws
         else:
-            result[v] = [(_find_root_bone_index_from_map(bone_index), 1.0)]
+            result[v] = [(root_bone_idx, 1.0)]
 
     return result
-
-
-def _find_root_bone_index_from_map(bone_index: dict[str, int]) -> int:
-    """Fallback: return index 0."""
-    return 0
 
 
 def _compute_inverse_bind_matrices(bones: list[Bone]) -> np.ndarray:
