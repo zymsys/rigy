@@ -1,0 +1,61 @@
+version: "0.5"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+skinning_solver: dqs
+
+meshes:
+  - id: arm_mesh
+    primitives:
+      - type: capsule
+        id: upper
+        dimensions:
+          radius: 0.1
+          height: 0.4
+        transform:
+          translation: [0, 0.5, 0]
+      - type: capsule
+        id: lower
+        dimensions:
+          radius: 0.08
+          height: 0.4
+        transform:
+          translation: [0, 1.1, 0]
+
+armatures:
+  - id: arm
+    bones:
+      - id: root
+        parent: none
+        head: [0, 0, 0]
+        tail: [0, 0.8, 0]
+      - id: forearm
+        parent: root
+        head: [0, 0.8, 0]
+        tail: [0, 1.6, 0]
+
+bindings:
+  - mesh_id: arm_mesh
+    armature_id: arm
+    weights:
+      - primitive_id: upper
+        bones:
+          - bone_id: root
+            weight: 1.0
+      - primitive_id: lower
+        bones:
+          - bone_id: root
+            weight: 0.5
+          - bone_id: forearm
+            weight: 0.5
+
+poses:
+  - id: twist45
+    bones:
+      root:
+        rotation: [1, 0, 0, 0]
+      forearm:
+        rotation: [0.9238795325112867, 0, 0.3826834323650898, 0]

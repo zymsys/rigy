@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1/v0.2 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.5 specs."""
 
 from __future__ import annotations
 
@@ -153,6 +153,21 @@ class Binding(BaseModel):
     armature_id: str
     weights: list[PrimitiveWeights]
     weight_maps: list[WeightMap] | None = None
+    skinning_solver: Literal["lbs", "dqs"] | None = None
+
+
+class PoseBoneTransform(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rotation: tuple[float, float, float, float] | None = None  # [w, x, y, z]
+    translation: tuple[float, float, float] | None = None
+
+
+class Pose(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    bones: dict[str, PoseBoneTransform]
 
 
 class MirrorX(BaseModel):
@@ -249,7 +264,8 @@ class RigySpec(BaseModel):
     armatures: list[Armature] = []
     bindings: list[Binding] = []
     symmetry: Symmetry | None = None
-    skinning_solver: Literal["lbs"] | None = None
+    skinning_solver: Literal["lbs", "dqs"] | None = None
+    poses: list[Pose] = []
     # v0.2 fields
     anchors: list[Anchor] = []
     imports: dict[str, ImportDef] = {}
@@ -257,6 +273,18 @@ class RigySpec(BaseModel):
 
 
 # --- Resolved asset dataclass (used by import resolution) ---
+
+
+def resolve_solver(spec: RigySpec, binding: Binding) -> str:
+    """Return the effective skinning solver for a binding.
+
+    Priority: per-binding override > top-level spec > default ("lbs").
+    """
+    if binding.skinning_solver is not None:
+        return binding.skinning_solver
+    if spec.skinning_solver is not None:
+        return spec.skinning_solver
+    return "lbs"
 
 
 @dataclass

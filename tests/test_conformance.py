@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from rigy.exporter import export_gltf
+from rigy.exporter import export_baked_gltf, export_gltf
 from rigy.parser import parse_yaml
 from rigy.symmetry import expand_symmetry
 from rigy.validation import validate
@@ -47,7 +47,13 @@ def test_conformance_positive(test_entry, tmp_path):
         spec = expand_symmetry(spec)
         validate(spec)
         output_path = tmp_path / "output.glb"
-        export_gltf(spec, output_path, yaml_dir=input_path.parent)
+
+        if test_entry.get("baked"):
+            pose_id = test_entry["pose_id"]
+            pose = next(p for p in spec.poses if p.id == pose_id)
+            export_baked_gltf(spec, pose, output_path, yaml_dir=input_path.parent)
+        else:
+            export_gltf(spec, output_path, yaml_dir=input_path.parent)
 
     actual_bytes = output_path.read_bytes()
     expected_bytes = expected_path.read_bytes()

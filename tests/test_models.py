@@ -15,12 +15,15 @@ from rigy.models import (
     Instance,
     Mesh,
     MirrorX,
+    Pose,
+    PoseBoneTransform,
     Primitive,
     PrimitiveWeights,
     RicyContract,
     RigySpec,
     Symmetry,
     Transform,
+    resolve_solver,
 )
 
 
@@ -212,9 +215,9 @@ class TestSkinningSolver:
         spec = RigySpec(version="0.4")
         assert spec.skinning_solver is None
 
-    def test_dqs_rejected(self):
-        with pytest.raises(ValidationError):
-            RigySpec(version="0.4", skinning_solver="dqs")
+    def test_dqs_accepted(self):
+        spec = RigySpec(version="0.5", skinning_solver="dqs")
+        assert spec.skinning_solver == "dqs"
 
     def test_invalid_value_rejected(self):
         with pytest.raises(ValidationError):
@@ -352,3 +355,86 @@ class TestRicyContract:
     def test_unknown_field_rejected(self):
         with pytest.raises(ValidationError, match="extra"):
             RicyContract(contract_version="0.1", notes="hello")
+
+
+class TestBindingSkinningSolver:
+    def test_default_none(self):
+        b = Binding(
+            mesh_id="m", armature_id="a",
+            weights=[PrimitiveWeights(primitive_id="p", bones=[BoneWeight(bone_id="b", weight=1.0)])],
+        )
+        assert b.skinning_solver is None
+
+    def test_lbs(self):
+        b = Binding(
+            mesh_id="m", armature_id="a",
+            weights=[PrimitiveWeights(primitive_id="p", bones=[BoneWeight(bone_id="b", weight=1.0)])],
+            skinning_solver="lbs",
+        )
+        assert b.skinning_solver == "lbs"
+
+    def test_dqs(self):
+        b = Binding(
+            mesh_id="m", armature_id="a",
+            weights=[PrimitiveWeights(primitive_id="p", bones=[BoneWeight(bone_id="b", weight=1.0)])],
+            skinning_solver="dqs",
+        )
+        assert b.skinning_solver == "dqs"
+
+    def test_invalid_rejected(self):
+        with pytest.raises(ValidationError):
+            Binding(
+                mesh_id="m", armature_id="a",
+                weights=[PrimitiveWeights(primitive_id="p", bones=[BoneWeight(bone_id="b", weight=1.0)])],
+                skinning_solver="invalid",
+            )
+
+
+class TestPoseModel:
+    def test_valid(self):
+        pose = Pose(
+            id="rest",
+            bones={"root": PoseBoneTransform(rotation=(1.0, 0.0, 0.0, 0.0))},
+        )
+        assert pose.id == "rest"
+        assert pose.bones["root"].rotation == (1.0, 0.0, 0.0, 0.0)
+
+    def test_translation_only(self):
+        pose = Pose(
+            id="moved",
+            bones={"root": PoseBoneTransform(translation=(1.0, 2.0, 3.0))},
+        )
+        assert pose.bones["root"].translation == (1.0, 2.0, 3.0)
+        assert pose.bones["root"].rotation is None
+
+    def test_empty_bones(self):
+        pose = Pose(id="empty", bones={})
+        assert pose.bones == {}
+
+    def test_unknown_field_rejected(self):
+        with pytest.raises(ValidationError, match="extra"):
+            PoseBoneTransform(rotation=(1, 0, 0, 0), scale=(1, 1, 1))
+
+
+class TestResolveSolver:
+    def _spec(self, solver=None):
+        return RigySpec(version="0.5", skinning_solver=solver)
+
+    def _binding(self, solver=None):
+        return Binding(
+            mesh_id="m", armature_id="a",
+            weights=[PrimitiveWeights(primitive_id="p", bones=[BoneWeight(bone_id="b", weight=1.0)])],
+            skinning_solver=solver,
+        )
+
+    def test_default_lbs(self):
+        assert resolve_solver(self._spec(), self._binding()) == "lbs"
+
+    def test_toplevel_dqs(self):
+        assert resolve_solver(self._spec("dqs"), self._binding()) == "dqs"
+
+    def test_binding_override(self):
+        assert resolve_solver(self._spec("dqs"), self._binding("lbs")) == "lbs"
+
+    def test_binding_dqs_over_toplevel_lbs(self):
+        assert resolve_solver(self._spec("lbs"), self._binding("dqs")) == "dqs"

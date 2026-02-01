@@ -1,5 +1,5 @@
 {
-  "version": "0.4",
+  "version": "0.5",
   "suite_revision": 1,
   "tests": [
     {
@@ -19,6 +19,72 @@
       "expected_output": "outputs/E01_humanoid.glb",
       "expected_sha256": "ce3d9227eaad36cbf6feaee183ce23662d69f0337647319a82c72102dd9a8c46",
       "description": "Humanoid with armature hierarchy, symmetry, and deterministic export"
+    },
+    {
+      "id": "L01_single_bone_dqs_identity",
+      "category": "L",
+      "type": "positive",
+      "baked": true,
+      "pose_id": "identity",
+      "input": "inputs/L01_single_bone_dqs_identity.rigy.yaml",
+      "expected_output": "outputs/L01_single_bone_dqs_identity.glb",
+      "expected_sha256": "38186601bae1a759449ee687e990972d8e089b0ee96b6de9ae67deb83b0c95de",
+      "description": "1 bone, DQS, identity pose — baseline"
+    },
+    {
+      "id": "L02_two_bone_dqs_twist",
+      "category": "L",
+      "type": "positive",
+      "baked": true,
+      "pose_id": "twist45",
+      "input": "inputs/L02_two_bone_dqs_twist.rigy.yaml",
+      "expected_output": "outputs/L02_two_bone_dqs_twist.glb",
+      "expected_sha256": "0a1cfde722a5c890d5029c2bcb438f53b747a122f037e4524a44b50259f11605",
+      "description": "2 bones, shared weights, forearm twist"
+    },
+    {
+      "id": "M01_mixed_solver",
+      "category": "M",
+      "type": "positive",
+      "baked": true,
+      "pose_id": "rot30",
+      "input": "inputs/M01_mixed_solver.rigy.yaml",
+      "expected_output": "outputs/M01_mixed_solver.glb",
+      "expected_sha256": "8380a307e4d1419976f795cba6658111c893414e7139ac0e98a362ac612b6e75",
+      "description": "2 meshes, 2 bindings: one LBS + one DQS"
+    },
+    {
+      "id": "M02_toplevel_override",
+      "category": "M",
+      "type": "positive",
+      "baked": true,
+      "pose_id": "tilt",
+      "input": "inputs/M02_toplevel_override.rigy.yaml",
+      "expected_output": "outputs/M02_toplevel_override.glb",
+      "expected_sha256": "fccd5f80c7e4f0bf5998b857012e6f196084ae079e982feffbf6620480c83bcc",
+      "description": "Top-level dqs, one binding overrides to lbs"
+    },
+    {
+      "id": "N01_opposing_quaternions",
+      "category": "N",
+      "type": "positive",
+      "baked": true,
+      "pose_id": "oppose",
+      "input": "inputs/N01_opposing_quaternions.rigy.yaml",
+      "expected_output": "outputs/N01_opposing_quaternions.glb",
+      "expected_sha256": "d5453cdc8901cc38c6edc12d18f8f0f633501eafba91f799763bf29db2bab549",
+      "description": "2 bones with opposite-hemisphere rotations"
+    },
+    {
+      "id": "N02_near_antipodal",
+      "category": "N",
+      "type": "positive",
+      "baked": true,
+      "pose_id": "boundary",
+      "input": "inputs/N02_near_antipodal.rigy.yaml",
+      "expected_output": "outputs/N02_near_antipodal.glb",
+      "expected_sha256": "69119bf8534ce61e06bda261802fb1c3b97622fc1bd8119187fd9148c9e61f2a",
+      "description": "2 bones at hemisphere boundary (dot ≈ 0)"
     }
   ]
 }

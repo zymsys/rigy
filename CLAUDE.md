@@ -12,6 +12,8 @@ uv run pytest -k test_name       # run tests matching name
 uv run ruff check src/           # lint
 uv run ruff format src/          # format
 rigy compile input.rigy.yaml -o output.glb  # compile a spec
+rigy compile input.rigy.yaml --pose rest --bake-skin -o baked.glb  # baked pose export
+f3d output.glb --output render.png --resolution 800,600  # render GLB to PNG
 ```
 
 ## Architecture
@@ -39,7 +41,7 @@ Orchestrated in `cli.py`, each stage has a dedicated module in `src/rigy/`:
 - **Determinism**: Same YAML must produce byte-identical GLB. Tests verify this.
 - **Coordinate system**: glTF 2.0 aligned — Y-up, -Z forward, right-handed, meters.
 - **Transforms**: Rotation (Euler XYZ) applied before translation. Normals rotated but not translated.
-- **Spec version**: v0.1–v0.4. Parser accepts versions 0.1 through 0.4, rejects major ≥ 1. v0.4 adds `skinning_solver` field, V32 NaN/Infinity check, float64 intermediate precision, and a normative conformance suite under `conformance/`.
+- **Spec version**: v0.1–v0.5. Parser accepts versions 0.1 through 0.5, rejects major ≥ 1. v0.4 adds `skinning_solver` field, V32 NaN/Infinity check, float64 intermediate precision, and a normative conformance suite under `conformance/`. v0.5 adds DQS (`skinning_solver: dqs`), per-binding solver override, poses, baked GLB export, and the `dqs.py` pose evaluator.
 
 ## Test patterns
 
@@ -49,3 +51,13 @@ Orchestrated in `cli.py`, each stage has a dedicated module in `src/rigy/`:
 - Determinism tests compare byte-for-byte GLB output across runs
 - `tests/fixtures/humanoid.rigy.yaml` is a full example used in e2e tests
 - `composition/` contains v0.2 example files that v0.1 must reject
+
+## Visual verification
+
+**Always visually verify GLB output with f3d** when working on geometry, skinning, or export changes. Render to PNG and inspect:
+
+```bash
+f3d output.glb --output render.png --resolution 800,600
+```
+
+This catches bugs that unit tests miss (e.g. missing IBM composition in DQS, wrong rotation axes, mangled geometry). Compare against the reference rest-pose render of `conformance/outputs/I01_arm_weight_maps.glb` or `examples/I01_skinned.glb` as a sanity baseline.

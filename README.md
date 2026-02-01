@@ -221,13 +221,25 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 
 **Cylinder winding fix** — Bottom cap triangle winding corrected to match the normative spec pseudocode.
 
+### v0.5 — Dual Quaternion Skinning
+
+**DQS solver** — `skinning_solver: dqs` activates Dual Quaternion Skinning, which preserves volume at bent joints where LBS collapses. The solver runs in float64 with full dual-quaternion normalization and hemisphere consistency, truncating to float32 at the GLB boundary.
+
+**Per-binding solver override** — Each binding can set its own `skinning_solver`, overriding the top-level default. This allows mixing LBS and DQS within a single spec (e.g., rigid props use LBS, organic limbs use DQS).
+
+**Poses** — Named pose definitions (`poses[]`) specify per-bone rotations (unit quaternion `[w,x,y,z]`) and translations. Validated for finite components and unit-length quaternions (V36).
+
+**Baked GLB export** — `rigy compile --pose <id> --bake-skin` evaluates a pose and writes deformed geometry directly into the GLB, omitting JOINTS_0/WEIGHTS_0/Skin data. Useful for conformance testing and static snapshots.
+
+**Conformance fixtures** — Six new test cases (L01–N02) covering identity pose, two-bone twist, mixed solver, top-level override, opposing-hemisphere quaternions, and near-antipodal blending.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, and [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, and [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment.
 
 ## Development
 

@@ -32,6 +32,9 @@ def validate(spec: RigySpec) -> None:
     _check_instance_mesh_refs(spec)
     _check_no_id_collisions(spec)
     _check_no_nan_infinity(spec)
+    _check_dqs_rigid_bones(spec)
+    _check_pose_quaternions(spec)
+    _check_pose_bone_refs(spec)
     _warn_armature_root_not_at_origin(spec)
 
 
@@ -391,6 +394,54 @@ def _check_no_nan_infinity(spec: RigySpec) -> None:
 
     for anchor in spec.anchors:
         _check_floats(anchor.translation, f"anchor {anchor.id!r} translation")
+
+
+def _check_dqs_rigid_bones(spec: RigySpec) -> None:
+    """V35: DQS requires rigid bone transforms (no scale/shear).
+
+    The current Bone model has no scale or shear fields, so all bone
+    transforms are inherently rigid. This check is a structural guard
+    that reserves the validation slot for future extensions.
+    """
+
+
+def _check_pose_quaternions(spec: RigySpec) -> None:
+    """V36: Validate pose quaternion components are finite and unit-length."""
+    for pose in spec.poses:
+        for bone_id, pbt in pose.bones.items():
+            if pbt.rotation is not None:
+                w, x, y, z = pbt.rotation
+                for comp in (w, x, y, z):
+                    if not math.isfinite(comp):
+                        raise ValidationError(
+                            f"Non-finite quaternion component in pose {pose.id!r}, bone {bone_id!r}"
+                        )
+                norm_sq = w * w + x * x + y * y + z * z
+                if abs(norm_sq - 1.0) > 1e-6:
+                    raise ValidationError(
+                        f"Non-unit quaternion in pose {pose.id!r}, bone {bone_id!r}: "
+                        f"‖q‖² = {norm_sq}"
+                    )
+            if pbt.translation is not None:
+                for comp in pbt.translation:
+                    if not math.isfinite(comp):
+                        raise ValidationError(
+                            f"Non-finite translation component in pose {pose.id!r}, "
+                            f"bone {bone_id!r}"
+                        )
+
+
+def _check_pose_bone_refs(spec: RigySpec) -> None:
+    """Verify every bone_id in every pose exists in at least one armature."""
+    all_bone_ids: set[str] = set()
+    for arm in spec.armatures:
+        for bone in arm.bones:
+            all_bone_ids.add(bone.id)
+
+    for pose in spec.poses:
+        for bone_id in pose.bones:
+            if bone_id not in all_bone_ids:
+                raise ValidationError(f"Pose {pose.id!r} references unknown bone: {bone_id!r}")
 
 
 def _warn_armature_root_not_at_origin(spec: RigySpec) -> None:

@@ -80,7 +80,11 @@ def compute_skinning(
             # Layer 3: External JSON source
             if wm.source:
                 ext = _load_external_weights(
-                    wm.source, yaml_dir, wm.primitive_id, bone_index, end - start,
+                    wm.source,
+                    yaml_dir,
+                    wm.primitive_id,
+                    bone_index,
+                    end - start,
                 )
                 for local_v, bws in ext.items():
                     influences[start + local_v] = bws
@@ -94,7 +98,11 @@ def compute_skinning(
                     )
                 for grad in wm.gradients:
                     grad_influences = _evaluate_gradient(
-                        grad, positions, bone_index, start, end,
+                        grad,
+                        positions,
+                        bone_index,
+                        start,
+                        end,
                         root_bone_idx=root_bone_idx,
                     )
                     for v, bws in grad_influences.items():
@@ -126,8 +134,7 @@ def compute_skinning(
 
         if len(bone_weights) > 4:
             warnings.warn(
-                f"Vertex {v} has {len(bone_weights)} joint influences; "
-                f"capping to 4",
+                f"Vertex {v} has {len(bone_weights)} joint influences; capping to 4",
                 stacklevel=2,
             )
 

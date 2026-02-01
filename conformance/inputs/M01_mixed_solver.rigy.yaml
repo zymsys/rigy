@@ -1,0 +1,61 @@
+version: "0.5"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: mesh_lbs
+    primitives:
+      - type: box
+        id: box_lbs
+        dimensions:
+          x: 0.5
+          y: 0.5
+          z: 0.5
+        transform:
+          translation: [-1, 0.5, 0]
+  - id: mesh_dqs
+    primitives:
+      - type: box
+        id: box_dqs
+        dimensions:
+          x: 0.5
+          y: 0.5
+          z: 0.5
+        transform:
+          translation: [1, 0.5, 0]
+
+armatures:
+  - id: arm
+    bones:
+      - id: root
+        parent: none
+        head: [0, 0, 0]
+        tail: [0, 1, 0]
+
+bindings:
+  - mesh_id: mesh_lbs
+    armature_id: arm
+    skinning_solver: lbs
+    weights:
+      - primitive_id: box_lbs
+        bones:
+          - bone_id: root
+            weight: 1.0
+  - mesh_id: mesh_dqs
+    armature_id: arm
+    skinning_solver: dqs
+    weights:
+      - primitive_id: box_dqs
+        bones:
+          - bone_id: root
+            weight: 1.0
+
+poses:
+  - id: rot30
+    bones:
+      root:
+        rotation: [0.9659258262890683, 0, 0, 0.2588190451025208]

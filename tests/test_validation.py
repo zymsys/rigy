@@ -846,3 +846,141 @@ class TestValidation:
             ]
         )
         validate(spec)  # should not raise
+
+
+class TestV35:
+    def test_dqs_rigid_bones_trivially_passes(self):
+        """V35 is a structural guard — passes trivially with current Bone model."""
+        spec = _make_spec(
+            skinning_solver="dqs",
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+
+class TestV36:
+    def test_nan_quaternion_rejected(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"root": PoseBoneTransform(rotation=(float("nan"), 0, 0, 0))})],
+        )
+        with pytest.raises(ValidationError, match="Non-finite quaternion"):
+            validate(spec)
+
+    def test_non_unit_quaternion_rejected(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"root": PoseBoneTransform(rotation=(2.0, 0, 0, 0))})],
+        )
+        with pytest.raises(ValidationError, match="Non-unit quaternion"):
+            validate(spec)
+
+    def test_infinity_quaternion_rejected(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"root": PoseBoneTransform(rotation=(float("inf"), 0, 0, 0))})],
+        )
+        with pytest.raises(ValidationError, match="Non-finite quaternion"):
+            validate(spec)
+
+    def test_non_finite_translation_rejected(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"root": PoseBoneTransform(translation=(0, float("inf"), 0))})],
+        )
+        with pytest.raises(ValidationError, match="Non-finite translation"):
+            validate(spec)
+
+    def test_valid_quaternion_passes(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"root": PoseBoneTransform(rotation=(1.0, 0, 0, 0))})],
+        )
+        validate(spec)  # should not raise
+
+
+class TestPoseBoneRefs:
+    def test_invalid_bone_ref(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"nonexistent": PoseBoneTransform(rotation=(1.0, 0, 0, 0))})],
+        )
+        with pytest.raises(ValidationError, match="unknown bone"):
+            validate(spec)
+
+    def test_valid_bone_ref(self):
+        from rigy.models import Pose, PoseBoneTransform
+
+        spec = _make_spec(
+            armatures=[
+                {
+                    "id": "a1",
+                    "bones": [
+                        {"id": "root", "parent": "none", "head": [0, 0, 0], "tail": [0, 1, 0]}
+                    ],
+                }
+            ],
+            poses=[Pose(id="p1", bones={"root": PoseBoneTransform(rotation=(1.0, 0, 0, 0))})],
+        )
+        validate(spec)  # should not raise

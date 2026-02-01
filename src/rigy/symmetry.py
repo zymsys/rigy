@@ -184,9 +184,7 @@ def _mirror_weight_map(wm: WeightMap, prefix_from: str, prefix_to: str) -> Weigh
                 # Invert range and swap from/to
                 a, b = grad.range
                 new_range = (-b, -a)
-                new_gradients.append(
-                    Gradient(from_=new_to, to=new_from, axis="x", range=new_range)
-                )
+                new_gradients.append(Gradient(from_=new_to, to=new_from, axis="x", range=new_range))
             else:
                 new_gradients.append(
                     Gradient(from_=new_from, to=new_to, axis=grad.axis, range=grad.range)

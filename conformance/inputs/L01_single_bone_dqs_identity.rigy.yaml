@@ -1,0 +1,41 @@
+version: "0.5"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+skinning_solver: dqs
+
+meshes:
+  - id: cube
+    primitives:
+      - type: box
+        id: box1
+        dimensions:
+          x: 1.0
+          y: 1.0
+          z: 1.0
+
+armatures:
+  - id: arm
+    bones:
+      - id: root
+        parent: none
+        head: [0, 0, 0]
+        tail: [0, 1, 0]
+
+bindings:
+  - mesh_id: cube
+    armature_id: arm
+    weights:
+      - primitive_id: box1
+        bones:
+          - bone_id: root
+            weight: 1.0
+
+poses:
+  - id: identity
+    bones:
+      root:
+        rotation: [1, 0, 0, 0]

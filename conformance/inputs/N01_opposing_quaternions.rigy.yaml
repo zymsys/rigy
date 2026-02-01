@@ -1,0 +1,50 @@
+version: "0.5"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+skinning_solver: dqs
+
+meshes:
+  - id: tube
+    primitives:
+      - type: cylinder
+        id: cyl1
+        dimensions:
+          radius: 0.1
+          height: 1.0
+        transform:
+          translation: [0, 0.5, 0]
+
+armatures:
+  - id: arm
+    bones:
+      - id: root
+        parent: none
+        head: [0, 0, 0]
+        tail: [0, 0.5, 0]
+      - id: tip
+        parent: root
+        head: [0, 0.5, 0]
+        tail: [0, 1.0, 0]
+
+bindings:
+  - mesh_id: tube
+    armature_id: arm
+    weights:
+      - primitive_id: cyl1
+        bones:
+          - bone_id: root
+            weight: 0.5
+          - bone_id: tip
+            weight: 0.5
+
+poses:
+  - id: oppose
+    bones:
+      root:
+        rotation: [0.7071067811865476, 0.7071067811865476, 0, 0]
+      tip:
+        rotation: [-0.7071067811865476, -0.7071067811865476, 0, 0]
