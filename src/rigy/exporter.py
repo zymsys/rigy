@@ -15,6 +15,7 @@ from rigy.errors import ExportError
 from rigy.models import Pose, RigySpec
 from rigy.skinning import SkinData, compute_skinning
 from rigy.tessellation import tessellate_mesh
+from rigy.uv import generate_uv_sets
 
 
 def export_gltf(
@@ -173,6 +174,9 @@ def _build_gltf_baked(
                     )
                 material_map[prim.material] = mat_idx
 
+        # Generate UV sets on rest-pose positions (before deformation)
+        uv_arrays_baked = generate_uv_sets(mesh_def, mesh_data.positions, prim_ranges)
+
         # Get deformed positions/normals if bound
         positions = mesh_data.positions
         mesh_normals = mesh_data.normals
@@ -279,11 +283,44 @@ def _build_gltf_baked(
             )
         )
 
+        # Write UV buffers for baked path
+        uv_acc_indices_baked: list[int] = []
+        for uv_arr in uv_arrays_baked:
+            uv_offset = len(blob_data)
+            uv_bytes = uv_arr.astype(np.float32).tobytes()
+            blob_data.extend(uv_bytes)
+
+            uv_bv_idx = len(gltf.bufferViews)
+            gltf.bufferViews.append(
+                pygltflib.BufferView(
+                    buffer=0,
+                    byteOffset=uv_offset,
+                    byteLength=len(uv_bytes),
+                    target=pygltflib.ARRAY_BUFFER,
+                )
+            )
+
+            uv_acc_idx = len(gltf.accessors)
+            gltf.accessors.append(
+                pygltflib.Accessor(
+                    bufferView=uv_bv_idx,
+                    byteOffset=0,
+                    componentType=pygltflib.FLOAT,
+                    count=len(uv_arr),
+                    type=pygltflib.VEC2,
+                )
+            )
+            uv_acc_indices_baked.append(uv_acc_idx)
+
         # No JOINTS_0/WEIGHTS_0 — baked export omits skin data
         attributes = pygltflib.Attributes(
             POSITION=pos_acc_idx,
             NORMAL=norm_acc_idx,
         )
+
+        # Set TEXCOORD_N attributes for baked path
+        for i, acc_idx in enumerate(uv_acc_indices_baked):
+            setattr(attributes, f"TEXCOORD_{i}", acc_idx)
 
         mat_idx = None
         if mesh_def.primitives and mesh_def.primitives[0].material:
@@ -592,11 +629,45 @@ def _build_spec_meshes(
             )
         )
 
+        # Generate UV sets on rest-pose positions
+        uv_arrays = generate_uv_sets(mesh_def, mesh_data.positions, prim_ranges)
+        uv_acc_indices: list[int] = []
+        for uv_arr in uv_arrays:
+            uv_offset = len(blob_data)
+            uv_bytes = uv_arr.astype(np.float32).tobytes()
+            blob_data.extend(uv_bytes)
+
+            uv_bv_idx = len(gltf.bufferViews)
+            gltf.bufferViews.append(
+                pygltflib.BufferView(
+                    buffer=0,
+                    byteOffset=uv_offset,
+                    byteLength=len(uv_bytes),
+                    target=pygltflib.ARRAY_BUFFER,
+                )
+            )
+
+            uv_acc_idx = len(gltf.accessors)
+            gltf.accessors.append(
+                pygltflib.Accessor(
+                    bufferView=uv_bv_idx,
+                    byteOffset=0,
+                    componentType=pygltflib.FLOAT,
+                    count=len(uv_arr),
+                    type=pygltflib.VEC2,
+                )
+            )
+            uv_acc_indices.append(uv_acc_idx)
+
         # Build glTF primitives (one per mesh for now, all merged)
         attributes = pygltflib.Attributes(
             POSITION=pos_acc_idx,
             NORMAL=norm_acc_idx,
         )
+
+        # Set TEXCOORD_N attributes
+        for i, acc_idx in enumerate(uv_acc_indices):
+            setattr(attributes, f"TEXCOORD_{i}", acc_idx)
 
         # Skinning data
         skin_data: SkinData | None = None

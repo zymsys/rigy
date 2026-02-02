@@ -133,6 +133,69 @@ class TestExporter:
         assert out1.read_bytes() == out2.read_bytes()
 
 
+class TestUvExport:
+    def test_texcoord_0_present(self, tmp_path):
+        from rigy.models import UvSetEntry
+
+        spec = RigySpec(
+            version="0.8",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="planar_xy@1")},
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        prim = gltf.meshes[0].primitives[0]
+        assert prim.attributes.TEXCOORD_0 is not None
+        acc = gltf.accessors[prim.attributes.TEXCOORD_0]
+        assert acc.type == "VEC2"
+        assert acc.componentType == pygltflib.FLOAT
+        assert acc.count == 24  # box has 24 verts
+
+    def test_multiple_texcoords(self, tmp_path):
+        from rigy.models import UvSetEntry
+
+        spec = RigySpec(
+            version="0.8",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {
+                        "uv0": UvSetEntry(generator="planar_xy@1"),
+                        "uv1": UvSetEntry(generator="box_project@1"),
+                    },
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        prim = gltf.meshes[0].primitives[0]
+        assert prim.attributes.TEXCOORD_0 is not None
+        assert prim.attributes.TEXCOORD_1 is not None
+
+    def test_no_uv_sets_no_texcoord(self, minimal_mesh_yaml, tmp_path):
+        spec = RigySpec(**yaml.safe_load(minimal_mesh_yaml))
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        prim = gltf.meshes[0].primitives[0]
+        assert prim.attributes.TEXCOORD_0 is None
+
+
 def _make_material_spec(**overrides):
     base = {
         "version": "0.6",

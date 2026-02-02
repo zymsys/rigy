@@ -7,7 +7,13 @@ import re
 import warnings
 
 from rigy.errors import ValidationError
-from rigy.models import UV_ROLE_VOCABULARY, ResolvedAsset, RigySpec
+from rigy.models import (
+    UV_GENERATOR_APPLICABILITY,
+    UV_GENERATOR_VOCABULARY,
+    UV_ROLE_VOCABULARY,
+    ResolvedAsset,
+    RigySpec,
+)
 
 
 def validate(spec: RigySpec) -> None:
@@ -44,6 +50,12 @@ def validate(spec: RigySpec) -> None:
     _check_uv_set_token_format(spec)
     _check_material_uv_role_vocabulary(spec)
     _check_material_uv_role_refs(spec)
+    _check_uv_set_generator_required(spec)
+    _check_uv_set_generator_vocabulary(spec)
+    _check_uv_set_generator_applicability(spec)
+    _check_uv_roles_requires_uv_sets(spec)
+    _check_uv_role_set_declared(spec)
+    _check_uv_set_contiguous(spec)
     _warn_armature_root_not_at_origin(spec)
 
 
@@ -574,6 +586,96 @@ def _check_material_uv_role_refs(spec: RigySpec) -> None:
                         f"Mesh {mesh.id!r}: material {prim.material!r} requires "
                         f"UV role {role!r} but mesh does not expose it in uv_roles"
                     )
+
+
+def _check_uv_set_generator_required(spec: RigySpec) -> None:
+    """V50: Every UV set entry must have a non-empty generator."""
+    for mesh in spec.meshes:
+        if mesh.uv_sets is None:
+            continue
+        for key, entry in mesh.uv_sets.items():
+            if not entry.generator:
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: UV set {key!r} has empty generator"
+                )
+
+
+def _check_uv_set_generator_vocabulary(spec: RigySpec) -> None:
+    """V51: Generator must be in UV_GENERATOR_VOCABULARY."""
+    for mesh in spec.meshes:
+        if mesh.uv_sets is None:
+            continue
+        for key, entry in mesh.uv_sets.items():
+            if entry.generator not in UV_GENERATOR_VOCABULARY:
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: UV set {key!r} has unknown generator "
+                    f"{entry.generator!r} (valid: {sorted(UV_GENERATOR_VOCABULARY)})"
+                )
+
+
+def _check_uv_set_generator_applicability(spec: RigySpec) -> None:
+    """V52: Generator must be valid for every primitive type in the mesh."""
+    for mesh in spec.meshes:
+        if mesh.uv_sets is None:
+            continue
+        prim_types = {p.type for p in mesh.primitives}
+        for key, entry in mesh.uv_sets.items():
+            allowed = UV_GENERATOR_APPLICABILITY.get(entry.generator)
+            if allowed is None:
+                continue  # V51 catches unknown generators
+            for pt in prim_types:
+                if pt not in allowed:
+                    raise ValidationError(
+                        f"Mesh {mesh.id!r}: UV set {key!r} generator "
+                        f"{entry.generator!r} does not support primitive type {pt!r}"
+                    )
+
+
+def _check_uv_roles_requires_uv_sets(spec: RigySpec) -> None:
+    """V53: uv_roles present → uv_sets must also be present."""
+    for mesh in spec.meshes:
+        if mesh.uv_roles is not None and mesh.uv_sets is None:
+            raise ValidationError(
+                f"Mesh {mesh.id!r}: uv_roles is present but uv_sets is missing"
+            )
+
+
+def _check_uv_role_set_declared(spec: RigySpec) -> None:
+    """V54: Each uv_role.set must reference a key in uv_sets."""
+    for mesh in spec.meshes:
+        if mesh.uv_roles is None:
+            continue
+        # V53 ensures uv_sets exists when uv_roles exists
+        if mesh.uv_sets is None:
+            continue
+        for role, entry in mesh.uv_roles.items():
+            if entry.set not in mesh.uv_sets:
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: UV role {role!r} references undeclared "
+                    f"UV set {entry.set!r}"
+                )
+
+
+def _check_uv_set_contiguous(spec: RigySpec) -> None:
+    """V55: UV set keys must be uv0..uvN with no gaps."""
+    for mesh in spec.meshes:
+        if mesh.uv_sets is None:
+            continue
+        indices: list[int] = []
+        for key in mesh.uv_sets:
+            m = _UV_SET_PATTERN.match(key)
+            if not m:
+                raise ValidationError(
+                    f"Mesh {mesh.id!r}: UV set key {key!r} does not match 'uv<N>'"
+                )
+            indices.append(int(m.group(1)))
+        indices.sort()
+        expected = list(range(len(indices)))
+        if indices != expected:
+            raise ValidationError(
+                f"Mesh {mesh.id!r}: UV set keys must be contiguous uv0..uv{len(indices)-1}, "
+                f"got {sorted(mesh.uv_sets.keys())}"
+            )
 
 
 def _warn_armature_root_not_at_origin(spec: RigySpec) -> None:

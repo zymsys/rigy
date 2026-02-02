@@ -1177,7 +1177,7 @@ class TestUvRoleValidation:
             validate(spec)
 
     def test_v43_valid_uv_role_passes(self):
-        from rigy.models import UvRoleEntry
+        from rigy.models import UvRoleEntry, UvSetEntry
 
         spec = _make_spec(
             meshes=[
@@ -1186,6 +1186,7 @@ class TestUvRoleValidation:
                     "primitives": [
                         {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
                     ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="planar_xy@1")},
                     "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
                 }
             ],
@@ -1244,9 +1245,14 @@ class TestUvRoleValidation:
             validate(spec)
 
     def test_v45_valid_set_tokens(self):
-        from rigy.models import UvRoleEntry
+        from rigy.models import UvRoleEntry, UvSetEntry
 
         for token in ["uv0", "uv1", "uv99"]:
+            uv_sets = {}
+            # Build contiguous uv_sets up to the required index
+            idx = int(token[2:])
+            for i in range(idx + 1):
+                uv_sets[f"uv{i}"] = UvSetEntry(generator="planar_xy@1")
             spec = _make_spec(
                 meshes=[
                     {
@@ -1254,6 +1260,7 @@ class TestUvRoleValidation:
                         "primitives": [
                             {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
                         ],
+                        "uv_sets": uv_sets,
                         "uv_roles": {"albedo": UvRoleEntry(set=token)},
                     }
                 ],
@@ -1261,7 +1268,7 @@ class TestUvRoleValidation:
             validate(spec)  # should not raise
 
     def test_v46_material_uv_role_not_exposed(self):
-        from rigy.models import Material, UvRoleEntry
+        from rigy.models import Material, UvRoleEntry, UvSetEntry
 
         spec = _make_spec(
             materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo", "detail"])},
@@ -1276,6 +1283,7 @@ class TestUvRoleValidation:
                             "material": "mat1",
                         }
                     ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="planar_xy@1")},
                     "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
                 }
             ],
@@ -1284,7 +1292,7 @@ class TestUvRoleValidation:
             validate(spec)
 
     def test_v46_material_uv_role_exposed_passes(self):
-        from rigy.models import Material, UvRoleEntry
+        from rigy.models import Material, UvRoleEntry, UvSetEntry
 
         spec = _make_spec(
             materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo"])},
@@ -1299,6 +1307,7 @@ class TestUvRoleValidation:
                             "material": "mat1",
                         }
                     ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="planar_xy@1")},
                     "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
                 }
             ],
@@ -1321,3 +1330,170 @@ class TestUvRoleValidation:
             materials={"mat1": Material(base_color=[1.0, 0.0, 0.0, 1.0], uses_uv_roles=["albedo"])},
         )
         validate(spec)  # should not raise (no meshes, so no V46 cross-ref issue)
+
+
+class TestUvSetValidation:
+    def test_v50_empty_generator_rejected_by_pydantic(self):
+        """V50: Pydantic enforces generator is required; empty string caught by validation."""
+        from rigy.models import UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="empty generator"):
+            validate(spec)
+
+    def test_v51_unknown_generator_rejected(self):
+        from rigy.models import UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="foo@1")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="unknown generator"):
+            validate(spec)
+
+    def test_v52_sphere_latlong_on_box_rejected(self):
+        from rigy.models import UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="sphere_latlong@1")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="does not support primitive type"):
+            validate(spec)
+
+    def test_v52_planar_xy_on_any_passes(self):
+        from rigy.models import UvSetEntry
+
+        for prim_type, dims in [
+            ("box", {"x": 1, "y": 1, "z": 1}),
+            ("sphere", {"radius": 0.5}),
+            ("cylinder", {"radius": 0.5, "height": 1}),
+            ("capsule", {"radius": 0.25, "height": 1}),
+        ]:
+            spec = _make_spec(
+                meshes=[
+                    {
+                        "id": "m1",
+                        "primitives": [
+                            {"type": prim_type, "id": "p1", "dimensions": dims}
+                        ],
+                        "uv_sets": {"uv0": UvSetEntry(generator="planar_xy@1")},
+                    }
+                ],
+            )
+            validate(spec)  # should not raise
+
+    def test_v53_uv_roles_without_uv_sets_rejected(self):
+        from rigy.models import UvRoleEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv0")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="uv_roles is present but uv_sets is missing"):
+            validate(spec)
+
+    def test_v54_uv_role_references_undeclared_set(self):
+        from rigy.models import UvRoleEntry, UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {"uv0": UvSetEntry(generator="planar_xy@1")},
+                    "uv_roles": {"albedo": UvRoleEntry(set="uv1")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="undeclared UV set"):
+            validate(spec)
+
+    def test_v55_gap_in_indices_rejected(self):
+        from rigy.models import UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {
+                        "uv0": UvSetEntry(generator="planar_xy@1"),
+                        "uv2": UvSetEntry(generator="planar_xy@1"),
+                    },
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="contiguous"):
+            validate(spec)
+
+    def test_v55_contiguous_passes(self):
+        from rigy.models import UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {
+                        "uv0": UvSetEntry(generator="planar_xy@1"),
+                        "uv1": UvSetEntry(generator="box_project@1"),
+                    },
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+    def test_v55_invalid_key_format_rejected(self):
+        from rigy.models import UvSetEntry
+
+        spec = _make_spec(
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "box", "id": "p1", "dimensions": {"x": 1, "y": 1, "z": 1}}
+                    ],
+                    "uv_sets": {"tex0": UvSetEntry(generator="planar_xy@1")},
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="does not match"):
+            validate(spec)

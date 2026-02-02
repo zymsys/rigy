@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.7 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.8 specs."""
 
 from __future__ import annotations
 
@@ -12,10 +12,31 @@ UV_ROLE_VOCABULARY: frozenset[str] = frozenset({
     "albedo", "detail", "directional", "radial", "decal", "lightmap",
 })
 
+UV_GENERATOR_VOCABULARY: frozenset[str] = frozenset({
+    "planar_xy@1",
+    "box_project@1",
+    "sphere_latlong@1",
+    "cylindrical@1",
+    "capsule_cyl_latlong@1",
+})
+
+UV_GENERATOR_APPLICABILITY: dict[str, frozenset[str]] = {
+    "planar_xy@1": frozenset({"box", "sphere", "cylinder", "capsule"}),
+    "box_project@1": frozenset({"box"}),
+    "sphere_latlong@1": frozenset({"sphere"}),
+    "cylindrical@1": frozenset({"cylinder"}),
+    "capsule_cyl_latlong@1": frozenset({"capsule"}),
+}
+
 
 class UvRoleEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
     set: str
+
+
+class UvSetEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    generator: str
 
 
 class CoordinateSystem(BaseModel):
@@ -64,6 +85,7 @@ class Mesh(BaseModel):
     id: str
     name: str | None = None
     primitives: list[Primitive]
+    uv_sets: dict[str, UvSetEntry] | None = None
     uv_roles: dict[str, UvRoleEntry] | None = None
 
 

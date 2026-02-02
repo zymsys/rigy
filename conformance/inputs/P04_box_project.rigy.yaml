@@ -6,14 +6,8 @@ coordinate_system:
   handedness: right
 tessellation_profile: v0_1_default
 
-materials:
-  red:
-    base_color: [0.8, 0.2, 0.1, 1.0]
-    uses_uv_roles:
-      - albedo
-
 meshes:
-  - id: colored_box
+  - id: box_mesh
     primitives:
       - type: box
         id: box1
@@ -21,10 +15,6 @@ meshes:
           x: 1.0
           y: 1.0
           z: 1.0
-        material: red
     uv_sets:
       uv0:
-        generator: planar_xy@1
-    uv_roles:
-      albedo:
-        set: uv0
+        generator: box_project@1

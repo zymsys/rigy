@@ -1,0 +1,18 @@
+version: "0.8"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: sphere_mesh
+    primitives:
+      - type: sphere
+        id: sphere1
+        dimensions:
+          radius: 0.5
+    uv_sets:
+      uv0:
+        generator: sphere_latlong@1

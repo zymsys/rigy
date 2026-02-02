@@ -36,7 +36,7 @@ class TestParseYaml:
 
     def test_unsupported_minor_version_error(self):
         with pytest.raises(ParseError, match="Unsupported version"):
-            parse_yaml('version: "0.8"\nunits: meters\n')
+            parse_yaml('version: "0.9"\nunits: meters\n')
 
     def test_v05_accepted(self):
         spec = parse_yaml('version: "0.5"\nunits: meters\n')
@@ -88,6 +88,10 @@ meshes:
         assert "red" in spec.materials
         assert spec.materials["red"].base_color == [1.0, 0.0, 0.0, 1.0]
         assert spec.meshes[0].primitives[0].material == "red"
+
+    def test_v08_accepted(self):
+        spec = parse_yaml('version: "0.8"\nunits: meters\n')
+        assert spec.version == "0.8"
 
     def test_v07_accepted(self):
         spec = parse_yaml('version: "0.7"\nunits: meters\n')

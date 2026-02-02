@@ -261,13 +261,32 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 
 **Conformance fixtures** — Two new test cases (P01–P02) covering UV roles with schema-only GLB output and invalid UV role references.
 
+### v0.8 — Deterministic UV generation
+
+**UV sets** — Meshes can declare `uv_sets`, a mapping from contiguous keys (`uv0`, `uv1`, ...) to UV generator entries. Each entry specifies a `generator` that deterministically computes `(u, v)` coordinates from the tessellated geometry.
+
+**Five generators** — Each generator is versioned and produces frozen math:
+- `planar_xy@1` — `u = x, v = y`. Works on all primitive types.
+- `box_project@1` — Per-face projection for boxes. Each of the 6 faces maps two axes to `(u, v)`.
+- `sphere_latlong@1` — Index-based latitude/longitude UVs for spheres. `u = lon/32, v = lat/16`.
+- `cylindrical@1` — Side seam + polar cap mapping for cylinders.
+- `capsule_cyl_latlong@1` — Continuous `v` spanning top hemisphere → cylinder → bottom hemisphere for capsules.
+
+**glTF export** — UV sets are written as `TEXCOORD_0`, `TEXCOORD_1`, etc. in the GLB. UVs are computed on rest-pose positions before any pose deformation, ensuring consistency between standard and baked export paths.
+
+**UV roles integration** — `uv_roles` now requires `uv_sets` to also be present (V53), and each role's `set` must reference a declared UV set key (V54).
+
+**Validation (V50–V55)** — Generator required (V50), generator vocabulary (V51), generator applicability per primitive type (V52), `uv_roles` requires `uv_sets` (V53), role set references declared UV sets (V54), and contiguous UV set key indices (V55).
+
+**Conformance fixtures** — Seven new test cases (P03–P09) covering each generator, symmetry with UVs, and multiple UV sets.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, and [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, and [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment.
 
 ## Development
 

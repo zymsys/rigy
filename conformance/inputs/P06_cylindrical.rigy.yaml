@@ -1,0 +1,19 @@
+version: "0.8"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: cyl_mesh
+    primitives:
+      - type: cylinder
+        id: cyl1
+        dimensions:
+          radius: 0.5
+          height: 1.0
+    uv_sets:
+      uv0:
+        generator: cylindrical@1

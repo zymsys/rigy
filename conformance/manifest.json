@@ -1,6 +1,6 @@
 {
-  "version": "0.7",
-  "suite_revision": 3,
+  "version": "0.8",
+  "suite_revision": 4,
   "tests": [
     {
       "id": "I01_arm_weight_maps",
@@ -118,8 +118,8 @@
       "type": "positive",
       "input": "inputs/P01_uv_roles_schema_only.rigy.yaml",
       "expected_output": "outputs/P01_uv_roles_schema_only.glb",
-      "expected_sha256": "e822e8f51f6a5b029e9b396d5572bdbead1048ef6e2927cf9479d80f19eb7288",
-      "description": "Mesh with uv_roles and material with uses_uv_roles — GLB identical to without (schema-only)"
+      "expected_sha256": "40e60baf51669197cc182131766aeb352d66b8a9f070d8638ebfa40321db48da",
+      "description": "Mesh with uv_sets, uv_roles, and material with uses_uv_roles — includes TEXCOORD_0"
     },
     {
       "id": "P02_uv_role_not_exposed",
@@ -127,7 +127,70 @@
       "type": "negative",
       "input": "inputs/P02_uv_role_not_exposed.rigy.yaml",
       "expected_error_type": "ValidationError",
-      "description": "Material references UV role not exposed by mesh (V46)"
+      "description": "Material references UV role not exposed by mesh (V46/V53)"
+    },
+    {
+      "id": "P03_planar_xy",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P03_planar_xy.rigy.yaml",
+      "expected_output": "outputs/P03_planar_xy.glb",
+      "expected_sha256": "ca0be3fb51965a744c8fd98bc4f825b14599407d5a08f36e523844bd0d9ad26b",
+      "description": "Box with planar_xy@1 UV generator"
+    },
+    {
+      "id": "P04_box_project",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P04_box_project.rigy.yaml",
+      "expected_output": "outputs/P04_box_project.glb",
+      "expected_sha256": "257d59b7d0e702e259b979653a05f2db3654d29945e05804b92d00f115628302",
+      "description": "Box with box_project@1 UV generator"
+    },
+    {
+      "id": "P05_sphere_latlong",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P05_sphere_latlong.rigy.yaml",
+      "expected_output": "outputs/P05_sphere_latlong.glb",
+      "expected_sha256": "09ee26507ac75e1c74327fb9382452917c7780092e5a4fb14aae19cf1d9ee6a2",
+      "description": "Sphere with sphere_latlong@1 UV generator"
+    },
+    {
+      "id": "P06_cylindrical",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P06_cylindrical.rigy.yaml",
+      "expected_output": "outputs/P06_cylindrical.glb",
+      "expected_sha256": "6bda9f18e48506504950c5b1909a3b8fe4e0efcaaa405a27bf51d9470d277f8f",
+      "description": "Cylinder with cylindrical@1 UV generator"
+    },
+    {
+      "id": "P07_capsule_cyl_latlong",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P07_capsule_cyl_latlong.rigy.yaml",
+      "expected_output": "outputs/P07_capsule_cyl_latlong.glb",
+      "expected_sha256": "866be6867a8ce46934326d6273ab219cfd3a3908d5732175d2923f3612db7ace",
+      "description": "Capsule with capsule_cyl_latlong@1 UV generator"
+    },
+    {
+      "id": "P08_symmetry_uv",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P08_symmetry_uv.rigy.yaml",
+      "expected_output": "outputs/P08_symmetry_uv.glb",
+      "expected_sha256": "8045b20770b575e7f1875f36adef200497c88a966e81303afafd1a1167aa78c6",
+      "description": "Mirrored asset with UV sets preserved through symmetry expansion"
+    },
+    {
+      "id": "P09_multi_uv_sets",
+      "category": "P",
+      "type": "positive",
+      "input": "inputs/P09_multi_uv_sets.rigy.yaml",
+      "expected_output": "outputs/P09_multi_uv_sets.glb",
+      "expected_sha256": "49aac8cbb286c6ec3aa857120dfff462bec76fb43052fe6a7a01b35eb58f1020",
+      "description": "Mesh with two UV sets (uv0 + uv1)"
     }
   ]
 }

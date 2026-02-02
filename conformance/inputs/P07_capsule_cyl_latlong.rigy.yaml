@@ -1,0 +1,19 @@
+version: "0.8"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: capsule_mesh
+    primitives:
+      - type: capsule
+        id: capsule1
+        dimensions:
+          radius: 0.25
+          height: 1.0
+    uv_sets:
+      uv0:
+        generator: capsule_cyl_latlong@1
