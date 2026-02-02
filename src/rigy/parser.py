@@ -55,6 +55,11 @@ def parse_yaml(source: str | Path) -> RigySpec:
 
     _check_version(str(version))
 
+    # v0.10 preprocessing: repeat expansion + params substitution
+    from rigy.preprocessing import preprocess
+
+    data = preprocess(data)
+
     try:
         return RigySpec(**data)
     except PydanticValidationError as e:
@@ -124,5 +129,5 @@ def _check_version(version: str) -> None:
     except ValueError:
         raise ParseError(f"Invalid version format: {version!r}")
 
-    if (major, minor) > (0, 9):
-        raise ParseError(f"Unsupported version: {version!r} (latest supported is 0.9)")
+    if (major, minor) > (0, 10):
+        raise ParseError(f"Unsupported version: {version!r} (latest supported is 0.10)")

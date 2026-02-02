@@ -1,0 +1,11 @@
+version: "0.10"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: "test${leftover}"
+        dimensions:
+          x: 1
+          y: 1
+          z: 1

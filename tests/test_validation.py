@@ -1365,6 +1365,33 @@ class TestUvRoleValidation:
         validate(spec)  # should not raise (no meshes, so no V46 cross-ref issue)
 
 
+class TestV66RepeatIdCollision:
+    def test_repeat_expansion_duplicate_ids_rejected(self):
+        """V66: repeat expansion producing duplicate primitive IDs is caught by validation."""
+        from rigy.parser import parse_yaml
+
+        yaml_str = """\
+version: "0.10"
+units: meters
+meshes:
+  - id: m1
+    primitives:
+      - repeat:
+          count: 2
+          as: i
+          body:
+            type: box
+            id: same_id
+            dimensions:
+              x: 1
+              y: 1
+              z: 1
+"""
+        spec = parse_yaml(yaml_str)
+        with pytest.raises(ValidationError, match="Duplicate primitive id"):
+            validate(spec)
+
+
 class TestUvSetValidation:
     def test_v50_empty_generator_rejected_by_pydantic(self):
         """V50: Pydantic enforces generator is required; empty string caught by validation."""

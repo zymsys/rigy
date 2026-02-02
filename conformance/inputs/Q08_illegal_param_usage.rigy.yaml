@@ -1,0 +1,13 @@
+version: "0.10"
+units: meters
+params:
+  r: 1
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: "leg_$r"
+        dimensions:
+          x: 1
+          y: 1
+          z: 1

@@ -1,6 +1,6 @@
 {
-  "version": "0.9",
-  "suite_revision": 5,
+  "version": "0.10",
+  "suite_revision": 6,
   "tests": [
     {
       "id": "I01_arm_weight_maps",
@@ -200,6 +200,121 @@
       "expected_output": "outputs/C0901_wedge_2x2x2.glb",
       "expected_sha256": "e4767a554efc686c3d039d9dc21537862156e65686d3493431831238ac3e401f",
       "description": "Single wedge primitive 2x2x2, no armature, no materials"
+    },
+    {
+      "id": "Q01_params_basic",
+      "category": "Q",
+      "type": "positive",
+      "input": "inputs/Q01_params_basic.rigy.yaml",
+      "expected_output": "outputs/Q01_params_basic.glb",
+      "expected_sha256": "05f4a5b63afa4899efb6425b6e227009986213b02a706d61cd7c3c5585263cc7",
+      "description": "Params substitution for box dimensions"
+    },
+    {
+      "id": "Q02_repeat_basic",
+      "category": "Q",
+      "type": "positive",
+      "input": "inputs/Q02_repeat_basic.rigy.yaml",
+      "expected_output": "outputs/Q02_repeat_basic.glb",
+      "expected_sha256": "dfac6151dea9422ab48dca7a60177a4a8f5cd20f0c2fe5d5dcae10d195ac9006",
+      "description": "Repeat expansion producing 3 fence pickets"
+    },
+    {
+      "id": "Q03_repeat_params_combined",
+      "category": "Q",
+      "type": "positive",
+      "input": "inputs/Q03_repeat_params_combined.rigy.yaml",
+      "expected_output": "outputs/Q03_repeat_params_combined.glb",
+      "expected_sha256": "dfac6151dea9422ab48dca7a60177a4a8f5cd20f0c2fe5d5dcae10d195ac9006",
+      "description": "Repeat + params combined for fence pickets"
+    },
+    {
+      "id": "Q04_duplicate_yaml_key",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q04_duplicate_yaml_key.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Duplicate YAML mapping key (V56)"
+    },
+    {
+      "id": "Q05_unknown_field",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q05_unknown_field.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Unknown field at top level (V57)"
+    },
+    {
+      "id": "Q06_nonscalar_param",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q06_nonscalar_param.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Non-scalar param value (V58)"
+    },
+    {
+      "id": "Q07_unknown_param",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q07_unknown_param.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Reference to undeclared param (V59)"
+    },
+    {
+      "id": "Q08_illegal_param_usage",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q08_illegal_param_usage.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Embedded $param in string (V60)"
+    },
+    {
+      "id": "Q09_param_type_mismatch",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q09_param_type_mismatch.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "String param used where number expected (V61 — caught by Pydantic)"
+    },
+    {
+      "id": "Q10_invalid_repeat_count",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q10_invalid_repeat_count.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Negative repeat.count (V62)"
+    },
+    {
+      "id": "Q11_invalid_repeat_as",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q11_invalid_repeat_as.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Digit-leading repeat.as identifier (V63)"
+    },
+    {
+      "id": "Q12_invalid_repeat_structure",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q12_invalid_repeat_structure.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Extra keys in repeat block (V64)"
+    },
+    {
+      "id": "Q13_unresolved_token",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q13_unresolved_token.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Unresolved ${...} token after preprocessing (V65)"
+    },
+    {
+      "id": "Q14_id_collision_post_expansion",
+      "category": "Q",
+      "type": "negative",
+      "input": "inputs/Q14_id_collision_post_expansion.rigy.yaml",
+      "expected_error_type": "ValidationError",
+      "description": "Repeat expansion produces duplicate primitive IDs (V66)"
     }
   ]
 }

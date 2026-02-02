@@ -36,7 +36,7 @@ class TestParseYaml:
 
     def test_unsupported_minor_version_error(self):
         with pytest.raises(ParseError, match="Unsupported version"):
-            parse_yaml('version: "0.10"\nunits: meters\n')
+            parse_yaml('version: "0.11"\nunits: meters\n')
 
     def test_v05_accepted(self):
         spec = parse_yaml('version: "0.5"\nunits: meters\n')
@@ -179,6 +179,53 @@ meshes:
 
         with pytest.raises(ValidationError, match="wedge.*requires version >= 0.9"):
             validate(spec)
+
+    def test_v010_accepted(self):
+        spec = parse_yaml('version: "0.10"\nunits: meters\n')
+        assert spec.version == "0.10"
+
+    def test_v010_params_roundtrip(self):
+        yaml_str = """\
+version: "0.10"
+units: meters
+params:
+  box_size: 1.5
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions:
+          x: $box_size
+          y: $box_size
+          z: $box_size
+"""
+        spec = parse_yaml(yaml_str)
+        assert spec.meshes[0].primitives[0].dimensions["x"] == 1.5
+
+    def test_v010_repeat_roundtrip(self):
+        yaml_str = """\
+version: "0.10"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - repeat:
+          count: 3
+          as: i
+          body:
+            type: box
+            id: box${i}
+            dimensions:
+              x: 1
+              y: 1
+              z: 1
+"""
+        spec = parse_yaml(yaml_str)
+        assert len(spec.meshes[0].primitives) == 3
+        assert spec.meshes[0].primitives[0].id == "box0"
+        assert spec.meshes[0].primitives[1].id == "box1"
+        assert spec.meshes[0].primitives[2].id == "box2"
 
     def test_schema_error_wrapped(self):
         yaml_str = 'version: "0.1"\nmeshes:\n  - id: m\n    primitives:\n      - type: invalid_type\n        id: p\n        dimensions:\n          x: 1\n'

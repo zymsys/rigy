@@ -1,0 +1,15 @@
+version: "0.10"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - repeat:
+          count: 1
+          as: "0bad"
+          body:
+            type: box
+            id: p
+            dimensions:
+              x: 1
+              y: 1
+              z: 1

@@ -1,0 +1,20 @@
+version: "0.10"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+params:
+  box_size: 1.0
+
+meshes:
+  - id: parameterized_box
+    primitives:
+      - type: box
+        id: box1
+        dimensions:
+          x: $box_size
+          y: $box_size
+          z: $box_size

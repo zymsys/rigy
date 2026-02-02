@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.9 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.10 specs."""
 
 from __future__ import annotations
 

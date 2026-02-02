@@ -1,0 +1,13 @@
+version: "0.10"
+units: meters
+params:
+  name: "hello"
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions:
+          x: $name
+          y: 1
+          z: 1

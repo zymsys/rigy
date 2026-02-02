@@ -1,0 +1,27 @@
+version: "0.10"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+params:
+  picket_width: 0.1
+  picket_height: 1.0
+
+meshes:
+  - id: fence
+    primitives:
+      - repeat:
+          count: 3
+          as: i
+          body:
+            id: picket${i}
+            type: box
+            dimensions:
+              x: $picket_width
+              y: $picket_height
+              z: $picket_width
+            transform:
+              translation: ["${i}", 0, 0]

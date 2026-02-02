@@ -340,6 +340,18 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **Conformance fixture** — One new test case (C0901) covering a 2x2x2 wedge with byte-identical GLB verification.
 
+### v0.10 — Preprocessing: params & repeat macros
+
+**Preprocessing stage** — A mandatory preprocessing pass runs on the raw YAML data *before* schema validation. It expands `repeat` macros, substitutes `params` constants, strips the `params` key, and rejects any unresolved tokens. The pipeline becomes: YAML load → preprocess → schema validate → semantic validate → export.
+
+**`params` (compile-time constants)** — A top-level `params` mapping defines named scalar constants (number, string, or boolean). References like `$leg_radius` are substituted with the literal value. Only whole-scalar replacement is supported — string interpolation and expressions are rejected (V60). Param values are not recursively expanded.
+
+**`repeat` macro** — Deterministic duplication of list elements. A `repeat` block specifies `count`, `as` (index variable name), and `body` (a single object template). Index tokens like `${i}` are substituted with the zero-based index — `"${i}"` alone becomes a number, `"picket${i}"` becomes a string. Nested repeats are supported.
+
+**Validation (V56–V66)** — Duplicate YAML keys (V56), unknown fields (V57), non-scalar params (V58), unknown param references (V59), invalid param usage (V60), param type mismatch (V61), invalid repeat count/as/structure (V62–V64), unresolved `${…}` tokens (V65), and identifier collisions after expansion (V66).
+
+**Conformance fixtures** — Three positive test cases (Q01–Q03) covering params, repeat, and combined usage. Eleven negative test cases (Q04–Q14) covering all V56–V66 error codes.
+
 ### Rigs v0.1 — Scene composition
 
 A separate `.rigs.yaml` format that composes multiple Rigy assets into a single glTF scene. Deterministic, no scripting, no arbitrary transforms.
@@ -368,7 +380,7 @@ Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in 
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, [`spec/rigy_spec_v0.10_amendment_rc1.md`](spec/rigy_spec_v0.10_amendment_rc1.md) for the v0.10 preprocessing amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
 
 ## Development
 
