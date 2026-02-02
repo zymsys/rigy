@@ -1,0 +1,33 @@
+version: "0.2"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: cube_mesh
+    name: Cube
+    primitives:
+      - type: box
+        id: cube_box
+        dimensions: { x: 0.3, y: 0.3, z: 0.3 }
+        transform:
+          translation: [0, 0.15, 0]
+
+anchors:
+  # Bottom mount frame: p3 has Y offset so frame3 Y = world Y
+  - id: bottom_a
+    translation: [0.0, 0.0, 0.0]
+  - id: bottom_b
+    translation: [1.0, 0.0, 0.0]
+  - id: bottom_c
+    translation: [0.0, 1.0, 0.0]
+  # Top slot frame (for stacking)
+  - id: top_a
+    translation: [0.0, 0.3, 0.0]
+  - id: top_b
+    translation: [1.0, 0.3, 0.0]
+  - id: top_c
+    translation: [0.0, 1.3, 0.0]

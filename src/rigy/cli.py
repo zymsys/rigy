@@ -16,6 +16,12 @@ from rigy.symmetry import expand_symmetry
 from rigy.validation import validate, validate_composition
 
 
+def _is_rigs_file(path: Path) -> bool:
+    """Check if a path is a .rigs.yaml file."""
+    name = path.name
+    return name.endswith(".rigs.yaml") or name.endswith(".rigs.yml")
+
+
 @click.group()
 @click.version_option(version=__version__, prog_name="rigy")
 def main() -> None:
@@ -57,7 +63,11 @@ def compile(
     pose_id: str | None = None,
     bake_skin: bool = False,
 ) -> None:
-    """Compile a .rigy.yaml spec to GLB."""
+    """Compile a .rigy.yaml or .rigs.yaml spec to GLB."""
+    if _is_rigs_file(input_file):
+        _compile_rigs(input_file, output)
+        return
+
     if output is None:
         # Strip .rigy.yaml or .yaml and add .glb
         stem = input_file.name
@@ -94,6 +104,31 @@ def compile(
             if bake_transforms:
                 composed = _bake_transforms(composed)
             export_gltf(composed, output, yaml_dir=input_file.parent)
+        click.echo(f"Compiled: {output}")
+    except RigyError as e:
+        raise click.ClickException(str(e))
+
+
+def _compile_rigs(input_file: Path, output: Path | None) -> None:
+    """Compile a .rigs.yaml scene composition file to GLB."""
+    from rigy.rigs_composition import compose_rigs
+    from rigy.rigs_exporter import export_rigs_gltf
+    from rigy.rigs_parser import parse_rigs
+    from rigy.rigs_validation import validate_rigs
+
+    if output is None:
+        stem = input_file.name
+        for suffix in [".rigs.yaml", ".rigs.yml"]:
+            if stem.endswith(suffix):
+                stem = stem[: -len(suffix)]
+                break
+        output = input_file.parent / f"{stem}.glb"
+
+    try:
+        asset = parse_rigs(input_file)
+        validate_rigs(asset)
+        composed = compose_rigs(asset)
+        export_rigs_gltf(composed, output)
         click.echo(f"Compiled: {output}")
     except RigyError as e:
         raise click.ClickException(str(e))

@@ -25,9 +25,14 @@ Requires Python 3.12+.
 ```bash
 rigy compile humanoid.rigy.yaml -o humanoid.glb
 rigy compile humanoid.rigy.yaml  # outputs humanoid.glb
+rigy compile scene.rigs.yaml -o scene.glb  # Rigs scene composition
 ```
 
+The CLI auto-detects `.rigs.yaml` files and routes to the Rigs composition pipeline.
+
 ### Library
+
+#### Rigy (single asset)
 
 ```python
 from rigy.parser import parse_with_imports
@@ -47,6 +52,21 @@ export_gltf(composed, Path("car.glb"))
 ```
 
 For v0.1 files without imports, the same pipeline works — `imported_assets` will be empty and `resolve_composition` passes through the root spec.
+
+#### Rigs (scene composition)
+
+```python
+from rigy.rigs_parser import parse_rigs
+from rigy.rigs_validation import validate_rigs
+from rigy.rigs_composition import compose_rigs
+from rigy.rigs_exporter import export_rigs_gltf
+from pathlib import Path
+
+asset = parse_rigs(Path("scene.rigs.yaml"))
+validate_rigs(asset)
+composed = compose_rigs(asset)
+export_rigs_gltf(composed, Path("scene.glb"))
+```
 
 ## Examples
 
@@ -159,6 +179,34 @@ instances:
 ```
 
 Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` block computes the rigid transform that maps the wheel's mount frame onto the car's anchor frame, positioning and rotating each wheel correctly.
+
+### Scene composition with Rigs (v0.1)
+
+A Rigs file (`.rigs.yaml`) composes multiple Rigy assets into a single glTF scene via slot-to-mount frame snapping (`tests/rigs_fixtures/nested_scene.rigs.yaml`):
+
+```yaml
+rigs_version: "0.1"
+imports:
+  plate: parts/base_plate.rigy.yaml
+  cube: parts/cube.rigy.yaml
+
+scene:
+  base: plate
+  children:
+    - id: cube1
+      base: cube
+      place:
+        slot:  { anchors: [top_a, top_b, top_c] }
+        mount: { anchors: [bottom_a, bottom_b, bottom_c] }
+      children:
+        - id: cube2
+          base: cube
+          place:
+            slot:  { anchors: [top_a, top_b, top_c] }
+            mount: { anchors: [bottom_a, bottom_b, bottom_c] }
+```
+
+Each child is placed by snapping its **mount** frame (three anchors on the child) onto a **slot** frame (three anchors on the parent). Optional `rotate` (discrete 0/90/180/270 deg yaw) and `nudge` (translation in slot-frame axes with friendly units like `20cm`, `1ft`) provide artist-friendly adjustments. Slots and mounts can be referenced by name via Ricy contracts or by explicit anchor triples.
 
 ## What's Implemented
 
@@ -280,13 +328,35 @@ Each wheel part defines its own mesh and a 3-point mount frame. The `attach3` bl
 
 **Conformance fixtures** — Seven new test cases (P03–P09) covering each generator, symmetry with UVs, and multiple UV sets.
 
+### Rigs v0.1 — Scene composition
+
+A separate `.rigs.yaml` format that composes multiple Rigy assets into a single glTF scene. Deterministic, no scripting, no arbitrary transforms.
+
+**Imports** — Alias-based references to `.rigy.yaml` asset files, resolved relative to the `.rigs.yaml` file's directory.
+
+**Scene tree** — A strict tree of instances rooted at a `base` asset. Each child has a unique `id`, references an import alias via `base`, and specifies a `place` block.
+
+**Slots and mounts** — Attachment frames defined by three Rigy anchors (`[p1, p2, p3]`). A **slot** is a target frame on the parent; a **mount** is an origin frame on the child. Both can be referenced by name (via Ricy contract `frame3_sets`) or by explicit anchor triple.
+
+**Placement** — Snaps a child's mount frame onto a parent's slot frame. The transform is computed as `R = Rs * Rrot * inv(Rm)`, `T = (Os + Tnudge) - R * Om`, all in float64.
+
+**Discrete rotation** — `rotate` accepts `0deg`, `90deg`, `180deg`, or `270deg`. Applied about the slot frame's up (Y) axis.
+
+**Nudge** — Translation in slot-frame axes (`east`/`up`/`north`) with unit support: `m`, `cm`, `in`, `ft`. Examples: `20cm`, `1ft`, `0.25m`.
+
+**Validation** — Unknown import aliases, duplicate instance IDs, missing anchors, unresolved named references, and degenerate frame3 constraints.
+
+**Export** — Produces a single GLB with a `scene` root node, instance nodes named by `id`, and mesh deduplication (instances sharing the same alias share the same glTF mesh index). Deterministic output.
+
+**CLI integration** — The `compile` command auto-detects `.rigs.yaml` files and routes to the Rigs pipeline.
+
 ## Coordinate System
 
 Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in meters.
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, and [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
 
 ## Development
 

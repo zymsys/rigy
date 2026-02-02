@@ -1,0 +1,34 @@
+version: "0.2"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: plate_mesh
+    name: BasePlate
+    primitives:
+      - type: box
+        id: plate
+        dimensions: { x: 2.0, y: 0.1, z: 2.0 }
+        transform:
+          translation: [0, 0.05, 0]
+
+anchors:
+  # Top-center slot frame: Y=up, X=right, Z=forward
+  # p3 has Y offset so frame3 Y = world Y
+  - id: top_a
+    translation: [0.0, 0.1, 0.0]
+  - id: top_b
+    translation: [1.0, 0.1, 0.0]
+  - id: top_c
+    translation: [0.0, 1.1, 0.0]
+  # Second slot frame (offset)
+  - id: side_a
+    translation: [0.8, 0.1, 0.0]
+  - id: side_b
+    translation: [1.8, 0.1, 0.0]
+  - id: side_c
+    translation: [0.8, 1.1, 0.0]

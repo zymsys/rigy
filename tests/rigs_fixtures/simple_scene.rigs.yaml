@@ -1,0 +1,13 @@
+rigs_version: "0.1"
+imports:
+  plate: parts/base_plate.rigy.yaml
+  cube: parts/cube.rigy.yaml
+
+scene:
+  base: plate
+  children:
+    - id: cube1
+      base: cube
+      place:
+        slot:  { anchors: [top_a, top_b, top_c] }
+        mount: { anchors: [bottom_a, bottom_b, bottom_c] }
