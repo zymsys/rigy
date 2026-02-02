@@ -22,6 +22,7 @@ def validate(spec: RigySpec) -> None:
     Raises:
         ValidationError: On any semantic rule violation.
     """
+    _check_wedge_version_gate(spec)
     _check_material_base_color_length(spec)
     _check_material_base_color_range(spec)
     _check_material_refs(spec)
@@ -57,6 +58,22 @@ def validate(spec: RigySpec) -> None:
     _check_uv_role_set_declared(spec)
     _check_uv_set_contiguous(spec)
     _warn_armature_root_not_at_origin(spec)
+
+
+def _check_wedge_version_gate(spec: RigySpec) -> None:
+    """Reject wedge primitives in specs with version < 0.9."""
+    parts = spec.version.split(".")
+    if len(parts) == 2:
+        major, minor = int(parts[0]), int(parts[1])
+        if (major, minor) >= (0, 9):
+            return
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            if prim.type == "wedge":
+                raise ValidationError(
+                    f"Primitive {prim.id!r} uses type 'wedge' which requires version >= 0.9, "
+                    f"but spec declares version {spec.version!r}"
+                )
 
 
 def _check_unique_mesh_ids(spec: RigySpec) -> None:

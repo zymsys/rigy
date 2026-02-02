@@ -1,0 +1,17 @@
+version: "0.9"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+meshes:
+  - id: wedge_mesh
+    primitives:
+      - type: wedge
+        id: wedge_prim
+        dimensions:
+          x: 2.0
+          y: 2.0
+          z: 2.0

@@ -30,6 +30,7 @@ def tessellate_primitive(primitive: Primitive, profile: str = "v0_1_default") ->
         "sphere": _tessellate_sphere,
         "cylinder": _tessellate_cylinder,
         "capsule": _tessellate_capsule,
+        "wedge": _tessellate_wedge,
     }
 
     gen = generators.get(primitive.type)
@@ -157,6 +158,64 @@ def _tessellate_box(dims: dict[str, float]) -> MeshData:
             normals.append(normal)
         # Two triangles per face
         indices.extend([base, base + 1, base + 2, base, base + 2, base + 3])
+
+    return MeshData(
+        positions=np.array(positions, dtype=np.float64),
+        normals=np.array(normals, dtype=np.float64),
+        indices=np.array(indices, dtype=np.uint32),
+    )
+
+
+def _tessellate_wedge(dims: dict[str, float]) -> MeshData:
+    """Wedge: 18 verts, 24 indices (8 triangles, 5 faces).
+
+    Right triangular prism extruded along Y. See spec v0.9 Section 4.2.
+    """
+    x = dims.get("x", 1.0)
+    y = dims.get("y", 1.0)
+    z = dims.get("z", 1.0)
+    hx = x / 2
+    hy = y / 2
+    hz = z / 2
+
+    # Conceptual vertices
+    v0 = (-hx, -hy, -hz)
+    v1 = (+hx, -hy, -hz)
+    v2 = (-hx, -hy, +hz)
+    v3 = (-hx, +hy, -hz)
+    v4 = (+hx, +hy, -hz)
+    v5 = (-hx, +hy, +hz)
+
+    # Slope normal: normalize(z, 0, x)
+    slope_len = math.sqrt(z * z + x * x)
+    slope_normal = (z / slope_len, 0.0, x / slope_len)
+
+    # Face definitions: (local_verts, normal, local_indices)
+    faces = [
+        # -z face (rect, 4 verts)
+        ([v0, v1, v4, v3], (0.0, 0.0, -1.0), [(0, 2, 1), (0, 3, 2)]),
+        # -x face (rect, 4 verts)
+        ([v0, v3, v5, v2], (-1.0, 0.0, 0.0), [(0, 2, 3), (0, 1, 2)]),
+        # slope face (rect, 4 verts)
+        ([v1, v2, v5, v4], slope_normal, [(0, 2, 1), (0, 3, 2)]),
+        # -y face (tri, 3 verts)
+        ([v0, v1, v2], (0.0, -1.0, 0.0), [(0, 1, 2)]),
+        # +y face (tri, 3 verts)
+        ([v3, v5, v4], (0.0, 1.0, 0.0), [(0, 1, 2)]),
+    ]
+
+    positions = []
+    normals = []
+    indices = []
+    base = 0
+
+    for verts, normal, local_indices in faces:
+        for v in verts:
+            positions.append(v)
+            normals.append(normal)
+        for tri in local_indices:
+            indices.extend([base + tri[0], base + tri[1], base + tri[2]])
+        base += len(verts)
 
     return MeshData(
         positions=np.array(positions, dtype=np.float64),

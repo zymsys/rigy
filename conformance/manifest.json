@@ -1,6 +1,6 @@
 {
-  "version": "0.8",
-  "suite_revision": 4,
+  "version": "0.9",
+  "suite_revision": 5,
   "tests": [
     {
       "id": "I01_arm_weight_maps",
@@ -191,6 +191,15 @@
       "expected_output": "outputs/P09_multi_uv_sets.glb",
       "expected_sha256": "49aac8cbb286c6ec3aa857120dfff462bec76fb43052fe6a7a01b35eb58f1020",
       "description": "Mesh with two UV sets (uv0 + uv1)"
+    },
+    {
+      "id": "C0901_wedge_2x2x2",
+      "category": "C",
+      "type": "positive",
+      "input": "inputs/C0901_wedge_2x2x2.rigy.yaml",
+      "expected_output": "outputs/C0901_wedge_2x2x2.glb",
+      "expected_sha256": "e4767a554efc686c3d039d9dc21537862156e65686d3493431831238ac3e401f",
+      "description": "Single wedge primitive 2x2x2, no armature, no materials"
     }
   ]
 }

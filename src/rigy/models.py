@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.8 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.9 specs."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ UV_GENERATOR_VOCABULARY: frozenset[str] = frozenset({
 })
 
 UV_GENERATOR_APPLICABILITY: dict[str, frozenset[str]] = {
-    "planar_xy@1": frozenset({"box", "sphere", "cylinder", "capsule"}),
+    "planar_xy@1": frozenset({"box", "sphere", "cylinder", "capsule", "wedge"}),
     "box_project@1": frozenset({"box"}),
     "sphere_latlong@1": frozenset({"sphere"}),
     "cylindrical@1": frozenset({"cylinder"}),
@@ -57,7 +57,7 @@ class Transform(BaseModel):
 class Primitive(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["box", "sphere", "cylinder", "capsule"]
+    type: Literal["box", "sphere", "cylinder", "capsule", "wedge"]
     id: str
     name: str | None = None
     dimensions: dict[str, float]

@@ -848,6 +848,39 @@ class TestValidation:
         validate(spec)  # should not raise
 
 
+class TestWedgeVersionGate:
+    def test_wedge_version_gate(self):
+        """Wedge in v0.8 spec should raise ValidationError."""
+        spec = _make_spec(
+            version="0.8",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "wedge", "id": "w1", "dimensions": {"x": 2, "y": 2, "z": 2}}
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="wedge.*requires version >= 0.9"):
+            validate(spec)
+
+    def test_wedge_v09_passes(self):
+        """Wedge in v0.9 spec should pass validation."""
+        spec = _make_spec(
+            version="0.9",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {"type": "wedge", "id": "w1", "dimensions": {"x": 2, "y": 2, "z": 2}}
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+
 class TestV35:
     def test_dqs_rigid_bones_trivially_passes(self):
         """V35 is a structural guard — passes trivially with current Bone model."""

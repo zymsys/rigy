@@ -36,7 +36,7 @@ class TestParseYaml:
 
     def test_unsupported_minor_version_error(self):
         with pytest.raises(ParseError, match="Unsupported version"):
-            parse_yaml('version: "0.9"\nunits: meters\n')
+            parse_yaml('version: "0.10"\nunits: meters\n')
 
     def test_v05_accepted(self):
         spec = parse_yaml('version: "0.5"\nunits: meters\n')
@@ -133,6 +133,52 @@ units: meters
         assert spec.version == "0.1"
         assert len(spec.meshes) == 1
         assert spec.meshes[0].primitives[0].type == "box"
+
+    def test_v09_accepted(self):
+        spec = parse_yaml('version: "0.9"\nunits: meters\n')
+        assert spec.version == "0.9"
+
+    def test_wedge_accepted_v09(self):
+        yaml_str = """\
+version: "0.9"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: wedge
+        id: w
+        dimensions:
+          x: 2.0
+          y: 2.0
+          z: 2.0
+"""
+        spec = parse_yaml(yaml_str)
+        assert spec.meshes[0].primitives[0].type == "wedge"
+
+    def test_wedge_rejected_v08(self):
+        yaml_str = """\
+version: "0.8"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: wedge
+        id: w
+        dimensions:
+          x: 2.0
+          y: 2.0
+          z: 2.0
+"""
+        # wedge is not in the Literal for v0.8 schema... actually it is now in the
+        # Pydantic model. The version gate is in validation, not parsing.
+        # So parsing should succeed, but validation should fail.
+        from rigy.validation import validate
+
+        spec = parse_yaml(yaml_str)
+        from rigy.errors import ValidationError
+
+        with pytest.raises(ValidationError, match="wedge.*requires version >= 0.9"):
+            validate(spec)
 
     def test_schema_error_wrapped(self):
         yaml_str = 'version: "0.1"\nmeshes:\n  - id: m\n    primitives:\n      - type: invalid_type\n        id: p\n        dimensions:\n          x: 1\n'
