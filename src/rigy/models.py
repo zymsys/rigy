@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -61,6 +62,17 @@ class Transform(BaseModel):
 
     translation: tuple[float, float, float] | None = None
     rotation_euler: tuple[float, float, float] | None = None
+    rotation_degrees: tuple[float, float, float] | None = None
+
+    @model_validator(mode="after")
+    def _normalize_rotation_fields(self) -> Transform:
+        if self.rotation_euler is not None and self.rotation_degrees is not None:
+            raise ValueError("Transform must set either 'rotation_euler' or 'rotation_degrees', not both")
+
+        if self.rotation_degrees is not None and self.rotation_euler is None:
+            self.rotation_euler = tuple(math.radians(v) for v in self.rotation_degrees)
+
+        return self
 
 
 class Primitive(BaseModel):

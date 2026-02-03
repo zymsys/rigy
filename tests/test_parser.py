@@ -227,6 +227,43 @@ meshes:
         assert spec.meshes[0].primitives[1].id == "box1"
         assert spec.meshes[0].primitives[2].id == "box2"
 
+    def test_rotation_degrees_parsed_and_converted(self):
+        yaml_str = """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+        transform:
+          rotation_degrees: [0, 90, 180]
+"""
+        spec = parse_yaml(yaml_str)
+        rotation = spec.meshes[0].primitives[0].transform.rotation_euler
+        assert rotation is not None
+        assert rotation[0] == pytest.approx(0.0)
+        assert rotation[1] == pytest.approx(1.57079632679)
+        assert rotation[2] == pytest.approx(3.14159265359)
+
+    def test_rotation_euler_and_degrees_rejected_together(self):
+        yaml_str = """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+        transform:
+          rotation_euler: [0.0, 1.5708, 0.0]
+          rotation_degrees: [0, 90, 0]
+"""
+        with pytest.raises(ParseError, match="rotation_degrees"):
+            parse_yaml(yaml_str)
+
     def test_schema_error_wrapped(self):
         yaml_str = 'version: "0.1"\nmeshes:\n  - id: m\n    primitives:\n      - type: invalid_type\n        id: p\n        dimensions:\n          x: 1\n'
         with pytest.raises(ParseError, match="Schema validation"):

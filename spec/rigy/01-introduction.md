@@ -28,6 +28,12 @@ Future work may include corrective shapes, pose-space deformation, constraints, 
 
 ## 1.2 Non-Goals
 
+### Scope Principle
+
+Rigy is a **compile target for geometry**, not a domain modeling language. Features encoding domain knowledge (architectural, furniture, character-specific) belong in authoring tools that emit Rigy, not in Rigy itself. See [Section 2.3](02-fundamentals.md#23-scope-boundary) for rationale.
+
+### Specific Exclusions
+
 Rigy v0.11 explicitly does **not**:
 
 * Add blendshapes, corrective shapes, or pose-space deformation

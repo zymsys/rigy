@@ -128,7 +128,7 @@ meshes:
     primitives:
       - type: box
         id: body
-        dimensions: { width: 2.0, height: 0.4, depth: 1.2 }
+        dimensions: { x: 2.0, y: 0.4, z: 1.2 }
 """
         with pytest.raises(ParseError):
             parse_yaml(yaml_str)

@@ -76,4 +76,48 @@ Any v0.11 macro that needs a vertical base MUST use `base_y`.
 
 ---
 
+## 2.3 Scope Boundary
+
+Rigy is a **compile target**, not a domain modeling language.
+
+### Design Principle
+
+Rigy provides deterministic, geometry-level primitives that higher-level tools compose into domain-specific outputs. The specification excludes features encoding domain knowledge because:
+
+1. **Domain specificity fractures interoperability.** A "gable roof" primitive useful in architecture is meaningless in character rigging.
+
+2. **Domain logic belongs in domain tools.** An architectural CAD tool knows what a "gable" is. Rigy does not. The CAD tool emits explicit primitives that any Rigy implementation processes.
+
+3. **Determinism requires simplicity.** Every Rigy feature must produce byte-identical output across implementations. Domain features introduce ambiguity and implementation variance.
+
+### Out of Scope Categories
+
+The following are **permanently out of scope**:
+
+| Category | Examples | Rationale |
+|----------|----------|-----------|
+| Architectural helpers | `gable_fill`, `stair_run`, `wall_openings` | Domain-specific |
+| Furniture helpers | `drawer_stack`, `shelf_unit` | Domain-specific |
+| Character helpers | `finger_splay`, `face_rig` | Domain-specific |
+| Procedural generators | `tree`, `terrain`, `scatter` | Require randomness |
+| Implicit modeling | `fillet`, `chamfer`, `boolean` | Break determinism |
+| Semantic shortcuts | `door`, `window`, `hinge` | Encode domain meaning |
+
+### Recommended Pattern
+
+Domain tools SHOULD:
+
+1. Implement domain features internally
+2. Expand them to Rigy primitives (box, sphere, cylinder, capsule, wedge)
+3. Emit standard Rigy YAML
+4. Use `tags` (v0.11) to preserve semantic intent
+
+### Citing This Section
+
+When rejecting out-of-scope feature requests:
+
+> "Per Section 2.3, domain-specific helpers are out of scope. Rigy is a compile target; domain logic belongs in authoring tools that emit explicit primitives."
+
+---
+
 **End of Chapter 2**

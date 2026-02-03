@@ -51,6 +51,7 @@ class TestTransform:
         t = Transform()
         assert t.translation is None
         assert t.rotation_euler is None
+        assert t.rotation_degrees is None
 
     def test_translation(self):
         t = Transform(translation=(1.0, 2.0, 3.0))
@@ -59,6 +60,14 @@ class TestTransform:
     def test_both(self):
         t = Transform(translation=(0, 0, 0), rotation_euler=(0.1, 0.2, 0.3))
         assert t.rotation_euler == (0.1, 0.2, 0.3)
+
+    def test_rotation_degrees_converted_to_euler(self):
+        t = Transform(rotation_degrees=(0.0, 90.0, 180.0))
+        assert t.rotation_euler == (0.0, pytest.approx(1.57079632679), pytest.approx(3.14159265359))
+
+    def test_rotation_fields_mutually_exclusive(self):
+        with pytest.raises(ValidationError, match="rotation_euler"):
+            Transform(rotation_euler=(0.1, 0.2, 0.3), rotation_degrees=(10.0, 20.0, 30.0))
 
     def test_wrong_length(self):
         with pytest.raises(ValidationError):

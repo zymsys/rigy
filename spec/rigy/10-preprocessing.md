@@ -253,12 +253,27 @@ aabb:
 - height is always along `+y`
 - thickness extrudes along the remaining horizontal axis
 
+### Offset Semantics (Normative)
+
+The `offset` parameter specifies the perpendicular displacement of the wall centerline, measured along the axis orthogonal to both the length axis and height (Y).
+
+| `axis` | Wall extends along | Thickness along | `offset` displaces |
+|--------|-------------------|-----------------|-------------------|
+| `x` | X | Z | Z coordinate |
+| `z` | Z | X | X coordinate |
+
+**Example**: For `axis: x`, `thickness: 0.2`, `offset: 3.0`:
+- Wall spans along X axis
+- Wall has depth 0.2m in Z
+- Wall centerline sits at Z=3.0 (spans Z=2.9 to Z=3.1)
+
 ### Syntax
 
 ```yaml
 - macro: box_decompose
   id: south_wall
   mesh: walls_mesh
+  material: wall_mat
   surface: exterior_wall
 
   axis: x
@@ -295,7 +310,8 @@ A macro item expands **in place**, replacing that item with the generated primit
 - `height > 0`, `thickness > 0`
 - `axis` MUST be `x` or `z`
 - `mesh` MUST reference an existing mesh ID
-- `surface` MUST reference an existing surface name
+- `material` (if present) MUST reference an existing material ID
+- `surface` is an optional user-defined label (no registry required)
 
 For each cutout:
 - `id` is required and MUST be a valid identifier
@@ -328,10 +344,13 @@ Let box span be `[A,B]`.
 
 Collision with any user-defined primitive ID is a ValidationError (**F114**).
 
-### Surface and Tags
+### Inherited Fields
 
-- All generated primitives inherit the macro's `surface`.
-- All inherit macro `tags`.
+All generated primitives inherit the following fields from the macro (when present):
+
+- `material` — required if the containing mesh has other primitives with materials (V41)
+- `surface` — user-defined label
+- `tags` — semantic tag list
 
 ---
 

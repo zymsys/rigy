@@ -50,7 +50,7 @@ meshes:
           body:
             id: picket${i}
             type: box
-            dimensions: { width: 0.02, height: 1.0, depth: 0.02 }
+            dimensions: { x: 0.02, y: 1.0, z: 0.02 }
             transform:
               translation: [${i}, 0, 0]
 ```
@@ -65,27 +65,27 @@ meshes:
     primitives:
       - id: picket0
         type: box
-        dimensions: { width: 0.02, height: 1.0, depth: 0.02 }
+        dimensions: { x: 0.02, y: 1.0, z: 0.02 }
         transform:
           translation: [0, 0, 0]
       - id: picket1
         type: box
-        dimensions: { width: 0.02, height: 1.0, depth: 0.02 }
+        dimensions: { x: 0.02, y: 1.0, z: 0.02 }
         transform:
           translation: [1, 0, 0]
       - id: picket2
         type: box
-        dimensions: { width: 0.02, height: 1.0, depth: 0.02 }
+        dimensions: { x: 0.02, y: 1.0, z: 0.02 }
         transform:
           translation: [2, 0, 0]
       - id: picket3
         type: box
-        dimensions: { width: 0.02, height: 1.0, depth: 0.02 }
+        dimensions: { x: 0.02, y: 1.0, z: 0.02 }
         transform:
           translation: [3, 0, 0]
       - id: picket4
         type: box
-        dimensions: { width: 0.02, height: 1.0, depth: 0.02 }
+        dimensions: { x: 0.02, y: 1.0, z: 0.02 }
         transform:
           translation: [4, 0, 0]
 ```
@@ -118,9 +118,9 @@ meshes:
       - id: floor
         type: box
         dimensions:
-          width: 4.0
-          height: 0.1
-          depth: 3.0
+          x: 4.0
+          y: 0.1
+          z: 3.0
         transform:
           translation: [2.0, 0.05, 1.5]
 ```
@@ -129,8 +129,31 @@ meshes:
 
 ## D.4 `box_decompose` Example (v0.11)
 
+### Axis and Offset Relationship
+
+```
+  Top-down view (looking down Y axis)
+
+  axis: x                      axis: z
+  =======                      =======
+
+  Z ^                          Z ^
+    |   wall spans X             |   +---+ wall spans Z
+    |   +-----------+            |   |   |
+    |   |           |            |   +---+
+    +---|-- offset -|---> X      +----offset----> X
+        +-----------+                 (X displacement)
+        (Z displacement)
+```
+
+### Full Example
+
 ```yaml
 version: "0.11"
+
+materials:
+  wall_mat:
+    base_color: [0.9, 0.85, 0.8, 1.0]
 
 meshes:
   - id: walls
@@ -138,6 +161,7 @@ meshes:
       - macro: box_decompose
         id: south_wall
         mesh: walls
+        material: wall_mat
         surface: exterior
 
         axis: x
@@ -160,12 +184,17 @@ meshes:
 ```yaml
 version: "0.11"
 
+materials:
+  wall_mat:
+    base_color: [0.9, 0.85, 0.8, 1.0]
+
 meshes:
   - id: walls
     primitives:
       # Gap before door
       - id: south_wall_gap_0
         type: box
+        material: wall_mat
         aabb:
           min: [0.0, 0.0, 0.0]
           max: [1.5, 2.5, 0.2]
@@ -174,6 +203,7 @@ meshes:
       # Above door
       - id: south_wall_door_above
         type: box
+        material: wall_mat
         aabb:
           min: [1.5, 2.1, 0.0]
           max: [2.5, 2.5, 0.2]
@@ -182,6 +212,7 @@ meshes:
       # Gap after door
       - id: south_wall_gap_1
         type: box
+        material: wall_mat
         aabb:
           min: [2.5, 0.0, 0.0]
           max: [4.0, 2.5, 0.2]
@@ -200,7 +231,7 @@ meshes:
     primitives:
       - id: exterior_wall_south
         type: box
-        dimensions: { width: 4.0, height: 2.5, depth: 0.2 }
+        dimensions: { x: 4.0, y: 2.5, z: 0.2 }
         tags: [wall, exterior, load_bearing]
 ```
 

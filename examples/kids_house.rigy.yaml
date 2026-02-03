@@ -1,0 +1,191 @@
+version: "0.11"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+materials:
+  wall_mat:
+    base_color: [0.96, 0.88, 0.62, 1.0]
+  roof_mat:
+    base_color: [0.85, 0.24, 0.18, 1.0]
+  chimney_mat:
+    base_color: [0.66, 0.30, 0.22, 1.0]
+  door_mat:
+    base_color: [0.42, 0.25, 0.14, 1.0]
+  glass_mat:
+    base_color: [0.70, 0.90, 1.00, 0.70]
+
+meshes:
+  - id: walls
+    primitives:
+      - macro: box_decompose
+        id: front_wall
+        mesh: walls
+        material: wall_mat
+        surface: exterior_front
+        axis: x
+        span: [-2.0, 2.0]
+        base_y: 0.0
+        height: 2.4
+        thickness: 0.2
+        offset: 1.7
+        cutouts:
+          - id: window_left
+            span: [-1.45, -0.85]
+            bottom: 1.0
+            top: 1.6
+          - id: door
+            span: [-0.45, 0.45]
+            bottom: 0.0
+            top: 1.8
+          - id: window_right
+            span: [0.85, 1.45]
+            bottom: 1.0
+            top: 1.6
+
+      - id: back_wall
+        type: box
+        material: wall_mat
+        dimensions:
+          x: 4.0
+          y: 2.4
+          z: 0.2
+        transform:
+          translation: [0.0, 1.2, -1.7]
+
+      - id: left_wall
+        type: box
+        material: wall_mat
+        dimensions:
+          x: 0.2
+          y: 2.4
+          z: 3.2
+        transform:
+          translation: [-1.9, 1.2, 0.0]
+
+      - id: right_wall
+        type: box
+        material: wall_mat
+        dimensions:
+          x: 0.2
+          y: 2.4
+          z: 3.2
+        transform:
+          translation: [1.9, 1.2, 0.0]
+
+      - id: gable_front_left
+        type: wedge
+        material: wall_mat
+        dimensions:
+          x: 2.0
+          y: 0.2
+          z: 0.8
+        transform:
+          rotation_degrees: [-90.0, 180.0, 0.0]
+          translation: [-1.0, 2.8, 1.7]
+
+      - id: gable_front_right
+        type: wedge
+        material: wall_mat
+        dimensions:
+          x: 2.0
+          y: 0.2
+          z: 0.8
+        transform:
+          rotation_degrees: [-90.0, 0.0, 0.0]
+          translation: [1.0, 2.8, 1.7]
+
+      - id: gable_back_left
+        type: wedge
+        material: wall_mat
+        dimensions:
+          x: 2.0
+          y: 0.2
+          z: 0.8
+        transform:
+          rotation_degrees: [-90.0, 180.0, 0.0]
+          translation: [-1.0, 2.8, -1.7]
+
+      - id: gable_back_right
+        type: wedge
+        material: wall_mat
+        dimensions:
+          x: 2.0
+          y: 0.2
+          z: 0.8
+        transform:
+          rotation_degrees: [-90.0, 0.0, 0.0]
+          translation: [1.0, 2.8, -1.7]
+
+  - id: roof
+    primitives:
+      - id: roof_front
+        type: box
+        material: roof_mat
+        dimensions:
+          x: 2.34094
+          y: 0.12
+          z: 3.8
+        transform:
+          rotation_degrees: [0.0, 0.0, 19.985]
+          translation: [-1.0795, 2.7436, 0.0]
+
+      - id: roof_back
+        type: box
+        material: roof_mat
+        dimensions:
+          x: 2.34094
+          y: 0.12
+          z: 3.8
+        transform:
+          rotation_degrees: [0.0, 0.0, -19.985]
+          translation: [1.0795, 2.7436, 0.0]
+
+  - id: chimney
+    primitives:
+      - id: chimney_stack
+        type: box
+        material: chimney_mat
+        dimensions:
+          x: 0.35
+          y: 0.9
+          z: 0.35
+        transform:
+          translation: [-1.1, 3.15, -0.35]
+
+  - id: door
+    primitives:
+      - id: front_door
+        type: box
+        material: door_mat
+        dimensions:
+          x: 0.8
+          y: 1.8
+          z: 0.05
+        transform:
+          translation: [0.0, 0.9, 1.825]
+
+  - id: windows
+    primitives:
+      - id: front_window_left
+        type: box
+        material: glass_mat
+        dimensions:
+          x: 0.5
+          y: 0.5
+          z: 0.04
+        transform:
+          translation: [-1.15, 1.3, 1.83]
+
+      - id: front_window_right
+        type: box
+        material: glass_mat
+        dimensions:
+          x: 0.5
+          y: 0.5
+          z: 0.04
+        transform:
+          translation: [1.15, 1.3, 1.83]

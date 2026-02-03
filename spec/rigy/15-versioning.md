@@ -69,13 +69,34 @@ Within a spec version, conformance suite corrections are tracked by `suite_revis
 
 ---
 
-## 15.6 Extension Points (Reserved)
+## 15.6 Extension Points
 
-Future extensions MUST:
+### What May Be Extended
+
+Future Rigy versions MAY add:
+
+* New geometric primitives (if universally useful, deterministic)
+* New skinning solvers (if deterministic, conformance-testable)
+* New UV generators (if applicable to multiple primitives)
+* New preprocessing macros (if pure structural expansion)
+
+All extensions MUST:
 
 * Operate on the same authoring data (YAML schema)
 * Obey the same determinism and conformance rules
 * Introduce new canonical tests upon activation
+
+### What Is Out of Scope
+
+The following are **permanently out of scope**:
+
+* Domain-specific primitives or macros (architectural, furniture, character)
+* Implicit modeling (CSG, fillets, chamfers)
+* Procedural generation (trees, terrain, scatter)
+* Runtime variability (expressions, conditionals, randomness)
+* Animation systems (keyframes, graphs, IK)
+
+See [Section 2.3](02-fundamentals.md#23-scope-boundary) for design rationale.
 
 ---
 

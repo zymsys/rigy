@@ -269,7 +269,7 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **`skinning_solver` field** — Reserved extension point. Only `"lbs"` (Linear Blend Skinning) is valid in v0.4; defaults to `"lbs"` when absent.
 
-**Box dimension keys** — Boxes now accept `width`/`height`/`depth` in addition to `x`/`y`/`z`.
+**Box dimension keys** — Use `x`/`y`/`z` as canonical; boxes also accept `width`/`height`/`depth` aliases.
 
 **Cylinder winding fix** — Bottom cap triangle winding corrected to match the normative spec pseudocode.
 

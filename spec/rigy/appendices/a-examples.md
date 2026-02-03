@@ -11,9 +11,9 @@ meshes:
       - id: body
         type: box
         dimensions:
-          width: 1.0
-          height: 1.0
-          depth: 1.0
+          x: 1.0
+          y: 1.0
+          z: 1.0
 
 armatures:
   - id: skeleton

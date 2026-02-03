@@ -1,5 +1,19 @@
 # 3. Primitives
 
+## 3.0 Dimension Key Summary
+
+| Primitive | Dimension Keys | Notes |
+|-----------|---------------|-------|
+| `box` | `x`, `y`, `z` | Also accepts `width`, `height`, `depth` aliases |
+| `wedge` | `x`, `y`, `z` | Mathematical naming only |
+| `sphere` | `radius` | — |
+| `cylinder` | `radius`, `height` | — |
+| `capsule` | `radius`, `height` | — |
+
+**Rationale**: Use `x/y/z` as the canonical axis-aligned vocabulary for boxes and wedges. `width/height/depth` remains accepted for box compatibility.
+
+---
+
 ## 3.1 Tessellation Profile Reference
 
 The `v0_1_default` tessellation profile, as defined in v0.1, remains the only supported profile. The conformance suite depends on the exact vertex and index counts produced by this profile.
@@ -229,6 +243,70 @@ Let `hx = x/2`, `hy = y/2`, `hz = z/2`. Define six conceptual vertices:
 These are **conceptual** vertices for geometry definition. The emitted vertex buffer duplicates vertices as needed to ensure flat normals and per-surface exclusivity.
 
 At any fixed Y, the cross-section is the right triangle `(A, B, C)` where the right angle is at `A` and the legs run along +X and +Z.
+
+### Visual Reference
+
+**Default orientation (top-down view, Y-up):**
+
+```
+            +Z
+             ^
+             |
+    C -------+------- B   (+hz)
+     \       |       /
+      \      |      /
+       \     |     /
+        \    |    /
+         \   |   /
+          \  |  /
+           \ | /
+    --------A----------> +X
+          (-hx)
+```
+
+- `A` = right-angle vertex at `(-hx, y, -hz)`
+- `B` = vertex at `(+hx, y, -hz)`
+- `C` = vertex at `(-hx, y, +hz)`
+- Legs extend along +X (A→B) and +Z (A→C)
+- Shape extrudes along Y axis from `-hy` to `+hy`
+- Triangular faces at `-y` and `+y`; slope face connects B-C edges
+
+### Common Rotation Recipes
+
+Use `rotation_degrees` for authoring these common orientations.
+`rotation_euler` (radians) remains available for compatibility.
+
+| Use Case | rotation_degrees | Notes |
+|----------|------------------|-------|
+| Default (slope toward +Z) | `[0, 0, 0]` | Hypotenuse faces +Z |
+| Slope toward -Z | `[0, 180, 0]` | 180° about Y |
+| Slope toward +X | `[0, -90, 0]` | -90° about Y |
+| Slope toward -X | `[0, 90, 0]` | 90° about Y |
+| Gable fill (triangular face toward +Z) | `[-90, 0, 0]` | -90° about X |
+| Gable fill (triangular face toward -Z) | `[90, 0, 0]` | 90° about X |
+
+**Gable example** (left half of front gable):
+
+```yaml
+- type: wedge
+  id: gable_left
+  dimensions: { x: 4.0, y: 0.2, z: 1.5 }
+  transform:
+    rotation_degrees: [-90, 180, 0]  # -90° about X, 180° about Y
+    translation: [-2.0, 3.45, 2.9]
+```
+
+### Degree-to-Radian Reference
+
+| Degrees | Radians | Value |
+|---------|---------|-------|
+| 0° | 0 | `0` |
+| 30° | π/6 | `0.5236` |
+| 45° | π/4 | `0.7854` |
+| 90° | π/2 | `1.5708` |
+| 180° | π | `3.1416` |
+| 270° | 3π/2 | `4.7124` |
+| -90° | -π/2 | `-1.5708` |
 
 ### Canonical Triangle Topology (Conceptual)
 
