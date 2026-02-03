@@ -1,8 +1,8 @@
-# Rigs Specification — v0.1-rc1 (Draft)
+# Rigs Specification v0.1
 
-**Status:** draft / implementation-ready probe  
-**Theme:** deterministic scene assembly via *slot-to-mount* snapping  
-**Scope:** a small scene language that composes existing **Rigy** assets into a glTF 2.0 scene at export time.
+**Status:** Specification
+**Theme:** Deterministic scene assembly via *slot-to-mount* snapping
+**Scope:** A scene language that composes existing Rigy assets into a glTF 2.0 scene at export time
 
 Rigs is intentionally constrained:
 - No scripting / expressions
@@ -21,10 +21,10 @@ The key words MUST, MUST NOT, SHOULD, and MAY are to be interpreted as in RFC 21
 
 A Rigs file MUST be able to:
 1. Import Rigy assets under stable aliases
-2. Choose a root (“base”) asset instance
+2. Choose a root ("base") asset instance
 3. Instantiate child assets and place them by snapping a child **mount** frame onto a parent **slot** frame
 4. Apply small artist-friendly adjustments:
-   - `rotate`: discrete yaw rotations about the slot “up” axis
+   - `rotate`: discrete yaw rotations about the slot "up" axis
    - `nudge`: translation along the slot axes in friendly units
 
 ---
@@ -34,8 +34,8 @@ A Rigs file MUST be able to:
 Rigs v0.1 does **not**:
 - Define animation, physics, collision, constraints, or procedural layout
 - Support general transforms (scale, arbitrary rotations, arbitrary translations)
-- Define a reusable “instance reference” DAG model (instances form a strict tree)
-- Flatten Rigy into a single “resolved Rigy” document (composition happens at glTF export time)
+- Define a reusable "instance reference" DAG model (instances form a strict tree)
+- Flatten Rigy into a single "resolved Rigy" document (composition happens at glTF export time)
 
 ---
 
@@ -67,8 +67,7 @@ Rules:
 - Import aliases MUST be unique.
 - A `base` reference uses an alias from `imports`.
 
-**Note:** Rigs does not define how Rigy file paths are resolved (cwd vs project root, etc.).
-An implementation MUST document its path resolution behavior.
+**Note:** Rigs does not define how Rigy file paths are resolved (cwd vs project root, etc.). An implementation MUST document its path resolution behavior.
 
 ---
 
@@ -103,11 +102,10 @@ Rules:
 
 ## 6. Slots and mounts
 
-A **slot** is an attachment target frame on the **parent** instance.  
+A **slot** is an attachment target frame on the **parent** instance.
 A **mount** is an attachment origin frame on the **child** instance.
 
-In v0.1, both slots and mounts resolve to a **frame3** triple of **Rigy anchor IDs**:
-`[p1, p2, p3]`.
+In v0.1, both slots and mounts resolve to a **frame3** triple of **Rigy anchor IDs**: `[p1, p2, p3]`.
 
 ### 6.1 SlotRef and MountRef forms
 
@@ -139,8 +137,7 @@ Resolution:
   - mount anchors in the **child** asset
 - Missing anchors are a ValidationError.
 
-**Rigs v0.1 does not define any implicit naming convention** (e.g., `_a/_b/_c` suffix rules).
-If you want named slots/mounts, use a contract.
+**Rigs v0.1 does not define any implicit naming convention** (e.g., `_a/_b/_c` suffix rules). If you want named slots/mounts, use a contract.
 
 ---
 
@@ -173,7 +170,7 @@ Fields:
 - `270deg`
 
 Semantics:
-- Rotation is applied about the **slot frame’s up axis**.
+- Rotation is applied about the **slot frame's up axis**.
 - Positive rotation is right-handed about that axis.
 
 Any other value is a ParseError.
@@ -215,23 +212,23 @@ Given positions:
 
 Define:
 - `origin = P1`
-- `X = normalize(P2 − P1)`
-- `T = (P3 − P1)`
-- `Z = normalize(X × T)`   (right-handed)
-- `Y = Z × X`
+- `X = normalize(P2 - P1)`
+- `T = (P3 - P1)`
+- `Z = normalize(X x T)`   (right-handed)
+- `Y = Z x X`
 
 Constraints (ValidationError if violated):
-- `distance(P1,P2) > ε`
-- `|X × T| > ε`  (non-collinear)
+- `distance(P1,P2) > epsilon`
+- `|X x T| > epsilon`  (non-collinear)
 
-Where `ε = 1e-9` in meters.
+Where `epsilon = 1e-9` in meters.
 
 ---
 
 ## 9. Placement transform math (normative)
 
 Let:
-- Parent slot frame: `(Os, Rs)` where `Os` is origin and `Rs` is a 3×3 basis with columns `(Xs, Ys, Zs)`
+- Parent slot frame: `(Os, Rs)` where `Os` is origin and `Rs` is a 3x3 basis with columns `(Xs, Ys, Zs)`
 - Child mount frame: `(Om, Rm)` in child local space
 - `Rrot` be the yaw rotation about `Ys` by `rotate`
 - `Tnudge` as defined in 7.2
@@ -239,14 +236,14 @@ Let:
 The child node transform in parent space is:
 
 - `R = Rs * Rrot * inverse(Rm)`
-- `T = (Os + Tnudge) − R * Om`
+- `T = (Os + Tnudge) - R * Om`
 
-The child’s world transform is parent_world * (R, T).
+The child's world transform is parent_world * (R, T).
 
 Determinism requirements:
 - Implementations MUST compute intermediate math in float64.
 - Implementations MUST use the same normalization and cross-product definitions as standard Euclidean linear algebra.
-- Any platform-dependent “fast math” or reordering that changes IEEE results is prohibited.
+- Any platform-dependent "fast math" or reordering that changes IEEE results is prohibited.
 
 ---
 
@@ -284,7 +281,7 @@ A conforming implementation MUST reject (ValidationError) for at least:
 
 ---
 
-## 12. Appendix — minimal examples
+## 12. Examples
 
 ### 12.1 Contract-free explicit anchors
 
@@ -328,4 +325,4 @@ scene:
 
 ---
 
-**End of Rigs Specification v0.1-rc1**
+**End of Rigs Specification v0.1**

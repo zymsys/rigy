@@ -1,23 +1,8 @@
-Ahhh — got it. Thanks for the correction.
-And honestly, that’s a *great* sign: it means Sigy just crossed the line from “cute sketch file” into **“this wants to be a language.”**
-
-Below is a **Sigy v0.1 – Sketch Specification (Draft)**, written in the same voice and structure family as Rigy/Rigs, but explicitly **non-normative, non-deterministic**, and authoring-first.
-
-You can drop this straight into the repo as something like:
-
-```
-/sigy/spec/sigy_v0.1-draft.md
-```
-
-The YAML you already have becomes the **primary worked example**.
-
----
-
-# Sigy Specification — v0.1 (Draft)
+# Sigy Specification v0.1 (Draft)
 
 **Status:** Draft / exploratory
-**Theme:** permissive sketching → structured compilation
-**Scope:** authoring-time spatial intent for buildings and interiors, compiled into Rigy
+**Theme:** Permissive sketching -> structured compilation
+**Scope:** Authoring-time spatial intent for buildings and interiors, compiled into Rigy
 
 ---
 
@@ -30,7 +15,7 @@ Sigy is **not** a runtime format and **not** a deterministic interchange format.
 Instead, Sigy exists to be:
 
 ```
-Sigy  →  Rigy  →  glTF / GLB
+Sigy  ->  Rigy  ->  glTF / GLB
 (sketch)   (contract)   (artifact)
 ```
 
@@ -62,7 +47,7 @@ Sigy v0.1 explicitly does **not**:
 * Define animation, physics, or interaction
 * Require a canonical compiler
 
-Multiple Sigy→Rigy compilers MAY exist and MAY produce different Rigy outputs from the same Sigy input.
+Multiple Sigy->Rigy compilers MAY exist and MAY produce different Rigy outputs from the same Sigy input.
 
 This is intentional.
 
@@ -100,11 +85,11 @@ This is a **convention**, not a contract.
 
 Sigy values *intent*:
 
-> “There is a door centered on the south wall.”
+> "There is a door centered on the south wall."
 
 Rigy requires *explicit realization*:
 
-> “This wall is split into three segments; the center segment is omitted.”
+> "This wall is split into three segments; the center segment is omitted."
 
 Sigy MAY be ambiguous.
 Rigy MUST NOT be.
@@ -184,7 +169,7 @@ shell:
 ### Notes
 
 * Roof geometry is **intent only**.
-* “Attic exists but inaccessible” has no required geometric interpretation.
+* "Attic exists but inaccessible" has no required geometric interpretation.
 
 ---
 
@@ -205,7 +190,6 @@ openings:
 
 * Openings do **not** imply boolean subtraction.
 * A compiler MAY:
-
   * segment walls
   * leave gaps
   * ignore openings entirely (for early passes)
@@ -233,7 +217,7 @@ derived_from_opening: front_door
 
 Anchors are **semantic commitments**:
 
-> “This point matters later.”
+> "This point matters later."
 
 ---
 
@@ -292,12 +276,12 @@ They exist to test whether the spatial model *feels usable*.
 
 ## 14. Compilation Relationship to Rigy
 
-A Sigy→Rigy compiler typically:
+A Sigy->Rigy compiler typically:
 
 1. Realizes floors, walls, roofs as Rigy primitives
 2. Segments walls to accommodate openings (or cheats)
-3. Converts anchors → Rigy anchors
-4. Converts interface frames → anchor triples
+3. Converts anchors -> Rigy anchors
+4. Converts interface frames -> anchor triples
 5. Emits pure, explicit Rigy YAML
 
 Rigy remains the **authoritative contract**.
@@ -330,13 +314,7 @@ This separation is deliberate.
 
 ## 16. Example
 
-See:
-
-```
-tempera_house.sigy.yaml
-```
-
-This file is the canonical Sigy v0.1 example and is expected to evolve alongside the spec.
+See the canonical Sigy v0.1 example file (e.g., `tempera_house.sigy.yaml`). This file is expected to evolve alongside the spec.
 
 ---
 
@@ -352,11 +330,3 @@ These are intentionally unresolved.
 ---
 
 **End of Sigy Specification v0.1 (Draft)**
-
----
-
-If you want next:
-
-* I can tighten this into the *exact* tone and sectioning style of Rigy/Rigs
-* Or write a **Sigy→Rigy compiler rules doc** (not code) so Claude Code has a clear target
-* Or add a short “Why Sigy exists” preamble to keep future contributors from trying to make it deterministic 😄
