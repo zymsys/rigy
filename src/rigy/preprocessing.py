@@ -1,4 +1,4 @@
-"""v0.10 preprocessing: repeat macro expansion and params substitution.
+"""v0.10–v0.11 preprocessing: repeat/params, AABB, and macro expansion.
 
 Operates on raw dicts/lists/scalars from ruamel.yaml, before Pydantic
 model construction. Never imports Pydantic models.
@@ -7,6 +7,7 @@ model construction. Never imports Pydantic models.
 from __future__ import annotations
 
 import copy
+import math
 import re
 
 from rigy.errors import ParseError
@@ -20,7 +21,8 @@ _UNRESOLVED_TOKEN_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")
 
 def preprocess(data: dict) -> dict:
     """Entry point. Deep-copies data, expands repeats, substitutes params,
-    strips the params key, and checks for unresolved tokens."""
+    strips the params key, checks for unresolved tokens, then expands
+    AABB and macros."""
     data = copy.deepcopy(data)
     _expand_repeats(data)
 
@@ -35,7 +37,14 @@ def preprocess(data: dict) -> dict:
         _substitute_params(data, {})
 
     _check_no_unresolved_tokens(data)
+    _expand_aabb(data)
+    _expand_macros(data)
     return data
+
+
+# ---------------------------------------------------------------------------
+# Repeat expansion (v0.10)
+# ---------------------------------------------------------------------------
 
 
 def _expand_repeats(obj: object) -> None:
@@ -126,6 +135,11 @@ def _substitute_index_token(obj: object, token_name: str, index: int) -> object:
     return obj
 
 
+# ---------------------------------------------------------------------------
+# Params substitution (v0.10)
+# ---------------------------------------------------------------------------
+
+
 def _validate_params(raw: object) -> dict:
     """Validate params mapping: keys are identifiers, values are scalars."""
     if not isinstance(raw, dict):
@@ -189,3 +203,285 @@ def _check_no_unresolved_tokens(obj: object) -> None:
     elif isinstance(obj, list):
         for item in obj:
             _check_no_unresolved_tokens(item)
+
+
+# ---------------------------------------------------------------------------
+# AABB expansion (v0.11)
+# ---------------------------------------------------------------------------
+
+
+def _expand_aabb(data: dict) -> None:
+    """Walk meshes[].primitives[] and convert aabb → dimensions + translation."""
+    for mesh in data.get("meshes", []):
+        if not isinstance(mesh, dict):
+            continue
+        for prim in mesh.get("primitives", []):
+            if not isinstance(prim, dict):
+                continue
+            if "aabb" not in prim:
+                continue
+
+            aabb = prim["aabb"]
+
+            # Reject aabb + dimensions
+            if "dimensions" in prim:
+                raise ParseError("aabb and dimensions are mutually exclusive")
+
+            # Validate aabb structure
+            if not isinstance(aabb, dict):
+                raise ParseError("aabb must be a mapping")
+            allowed_keys = {"min", "max"}
+            extra = set(aabb.keys()) - allowed_keys
+            if extra:
+                raise ParseError(f"Unknown keys inside aabb: {extra}")
+            if "min" not in aabb or "max" not in aabb:
+                raise ParseError("aabb requires both 'min' and 'max'")
+
+            mn = aabb["min"]
+            mx = aabb["max"]
+            if not isinstance(mn, list) or len(mn) != 3:
+                raise ParseError("aabb.min must be a list of 3 numbers")
+            if not isinstance(mx, list) or len(mx) != 3:
+                raise ParseError("aabb.max must be a list of 3 numbers")
+
+            for i in range(3):
+                if not isinstance(mn[i], (int, float)) or not math.isfinite(mn[i]):
+                    raise ParseError(f"aabb.min[{i}] must be a finite number")
+                if not isinstance(mx[i], (int, float)) or not math.isfinite(mx[i]):
+                    raise ParseError(f"aabb.max[{i}] must be a finite number")
+                if mx[i] <= mn[i]:
+                    raise ParseError(f"aabb.max[{i}] ({mx[i]}) must be > aabb.min[{i}] ({mn[i]})")
+
+            # F115: reject any transform keys alongside aabb
+            transform = prim.get("transform")
+            if isinstance(transform, dict) and transform:
+                raise ParseError(
+                    "F115: aabb must not be combined with transform "
+                    "(translation, rotation, or scale)"
+                )
+
+            # Convert
+            prim["dimensions"] = {
+                "width": mx[0] - mn[0],
+                "height": mx[1] - mn[1],
+                "depth": mx[2] - mn[2],
+            }
+            prim["transform"] = {
+                "translation": [
+                    (mn[0] + mx[0]) / 2,
+                    (mn[1] + mx[1]) / 2,
+                    (mn[2] + mx[2]) / 2,
+                ],
+            }
+            del prim["aabb"]
+
+
+# ---------------------------------------------------------------------------
+# Macro expansion (v0.11)
+# ---------------------------------------------------------------------------
+
+
+def _expand_macros(data: dict) -> None:
+    """Walk meshes[].primitives[] and expand macro items in-place."""
+    for mesh in data.get("meshes", []):
+        if not isinstance(mesh, dict):
+            continue
+        prims = mesh.get("primitives", [])
+        if not isinstance(prims, list):
+            continue
+        mesh_id = mesh.get("id", "")
+        i = 0
+        while i < len(prims):
+            item = prims[i]
+            if isinstance(item, dict) and "macro" in item:
+                macro_type = item["macro"]
+                if macro_type == "box_decompose":
+                    expanded = _expand_box_decompose(item, mesh_id)
+                else:
+                    raise ParseError(f"Unknown macro type: {macro_type!r}")
+                prims[i : i + 1] = expanded
+                i += len(expanded)
+            else:
+                i += 1
+
+
+def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
+    """Expand a box_decompose macro into box primitives."""
+    # Extract and validate fields
+    box_id = item.get("id")
+    if not box_id or not isinstance(box_id, str) or not _IDENTIFIER_RE.match(box_id):
+        raise ParseError("box_decompose: 'id' is required and must be a valid identifier")
+
+    axis = item.get("axis")
+    if axis not in ("x", "z"):
+        raise ParseError(f"box_decompose: axis must be 'x' or 'z', got {axis!r}")
+
+    span = item.get("span")
+    if not isinstance(span, list) or len(span) != 2:
+        raise ParseError("box_decompose: span must be a list of 2 numbers")
+    span_start, span_end = float(span[0]), float(span[1])
+    if span_start >= span_end:
+        raise ParseError(f"box_decompose: span[0] ({span_start}) must be < span[1] ({span_end})")
+
+    base_y = float(item.get("base_y", 0.0))
+    height = float(item.get("height", 0))
+    if height <= 0:
+        raise ParseError(f"box_decompose: height must be > 0, got {height}")
+
+    thickness = float(item.get("thickness", 0))
+    if thickness <= 0:
+        raise ParseError(f"box_decompose: thickness must be > 0, got {thickness}")
+
+    offset = float(item.get("offset", 0.0))
+
+    cutouts = item.get("cutouts", [])
+    if not isinstance(cutouts, list):
+        raise ParseError("box_decompose: cutouts must be a list")
+
+    macro_tags = item.get("tags", [])
+    if not isinstance(macro_tags, list):
+        macro_tags = []
+    macro_surface = item.get("surface")
+    macro_material = item.get("material")
+
+    # Validate and parse cutouts
+    parsed_cutouts = []
+    for cut in cutouts:
+        if not isinstance(cut, dict):
+            raise ParseError("box_decompose: each cutout must be a mapping")
+        cut_id = cut.get("id")
+        if not cut_id or not isinstance(cut_id, str) or not _IDENTIFIER_RE.match(cut_id):
+            raise ParseError(f"F116: cutout id must be a valid identifier, got {cut_id!r}")
+
+        cut_span = cut.get("span")
+        if not isinstance(cut_span, list) or len(cut_span) != 2:
+            raise ParseError(f"box_decompose: cutout {cut_id!r} span must be 2 numbers")
+        cut_start, cut_end = float(cut_span[0]), float(cut_span[1])
+        if cut_start >= cut_end:
+            raise ParseError(f"box_decompose: cutout {cut_id!r} span[0] must be < span[1]")
+        if cut_start < span_start or cut_end > span_end:
+            raise ParseError(
+                f"box_decompose: cutout {cut_id!r} span [{cut_start}, {cut_end}] "
+                f"exceeds box span [{span_start}, {span_end}]"
+            )
+
+        bottom = float(cut.get("bottom", 0.0))
+        top = float(cut.get("top", height))
+        if bottom >= top:
+            raise ParseError(f"box_decompose: cutout {cut_id!r} bottom must be < top")
+        if bottom < 0:
+            raise ParseError(f"box_decompose: cutout {cut_id!r} bottom must be >= 0")
+        if top > height:
+            raise ParseError(
+                f"box_decompose: cutout {cut_id!r} top ({top}) must be <= height ({height})"
+            )
+
+        parsed_cutouts.append(
+            {
+                "id": cut_id,
+                "span_start": cut_start,
+                "span_end": cut_end,
+                "bottom": bottom,
+                "top": top,
+            }
+        )
+
+    # Check 2D overlap between cutouts
+    for i_cut in range(len(parsed_cutouts)):
+        for j_cut in range(i_cut + 1, len(parsed_cutouts)):
+            a = parsed_cutouts[i_cut]
+            b = parsed_cutouts[j_cut]
+            # Overlap requires both span overlap AND vertical overlap
+            span_overlap = a["span_start"] < b["span_end"] and b["span_start"] < a["span_end"]
+            vert_overlap = a["bottom"] < b["top"] and b["bottom"] < a["top"]
+            if span_overlap and vert_overlap:
+                raise ParseError(f"box_decompose: cutouts {a['id']!r} and {b['id']!r} overlap")
+
+    # Sort cutouts by (span_start, span_end, bottom, top)
+    parsed_cutouts.sort(key=lambda o: (o["span_start"], o["span_end"], o["bottom"], o["top"]))
+
+    # Decomposition
+    result: list[dict] = []
+
+    def _make_box(
+        prim_id: str,
+        along_start: float,
+        along_end: float,
+        y_bottom: float,
+        y_top: float,
+    ) -> dict:
+        along_len = along_end - along_start
+        seg_height = y_top - y_bottom
+        cx_along = (along_start + along_end) / 2
+        cy = base_y + (y_bottom + y_top) / 2
+
+        if axis == "x":
+            dims = {"width": along_len, "height": seg_height, "depth": thickness}
+            translation = [cx_along, cy, offset]
+        else:  # axis == "z"
+            dims = {"width": thickness, "height": seg_height, "depth": along_len}
+            translation = [offset, cy, cx_along]
+
+        tags = list(macro_tags)
+
+        prim: dict = {
+            "type": "box",
+            "id": prim_id,
+            "dimensions": dims,
+            "transform": {"translation": translation},
+        }
+        if tags:
+            prim["tags"] = tags
+        if macro_surface is not None:
+            prim["surface"] = macro_surface
+        if macro_material is not None:
+            prim["material"] = macro_material
+        return prim
+
+    # Collect cut points along the box axis from cutout spans
+    cut_points = sorted(
+        {o["span_start"] for o in parsed_cutouts} | {o["span_end"] for o in parsed_cutouts}
+    )
+
+    # Emit full-height gap segments
+    gap_edges = [span_start] + cut_points + [span_end]
+    gap_idx = 0
+    for k in range(len(gap_edges) - 1):
+        seg_start = gap_edges[k]
+        seg_end = gap_edges[k + 1]
+        if seg_start >= seg_end:
+            continue
+        # Check if this segment overlaps with any cutout span
+        overlaps_cutout = any(
+            o["span_start"] <= seg_start and seg_end <= o["span_end"] for o in parsed_cutouts
+        )
+        if not overlaps_cutout:
+            prim_id = f"{box_id}_gap_{gap_idx}"
+            result.append(_make_box(prim_id, seg_start, seg_end, 0.0, height))
+            gap_idx += 1
+
+    # Emit below/above segments for each cutout
+    for cut in parsed_cutouts:
+        cut_id = cut["id"]
+        if cut["bottom"] > 0:
+            result.append(
+                _make_box(
+                    f"{box_id}_{cut_id}_below",
+                    cut["span_start"],
+                    cut["span_end"],
+                    0.0,
+                    cut["bottom"],
+                )
+            )
+        if cut["top"] < height:
+            result.append(
+                _make_box(
+                    f"{box_id}_{cut_id}_above",
+                    cut["span_start"],
+                    cut["span_end"],
+                    cut["top"],
+                    height,
+                )
+            )
+
+    return result

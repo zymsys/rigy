@@ -1,6 +1,6 @@
 {
-  "version": "0.10",
-  "suite_revision": 6,
+  "version": "0.11",
+  "suite_revision": 7,
   "tests": [
     {
       "id": "I01_arm_weight_maps",
@@ -315,6 +315,57 @@
       "input": "inputs/Q14_id_collision_post_expansion.rigy.yaml",
       "expected_error_type": "ValidationError",
       "description": "Repeat expansion produces duplicate primitive IDs (V66)"
+    },
+    {
+      "id": "H110_box_aabb_basic",
+      "category": "H",
+      "type": "positive",
+      "input": "inputs/H110_box_aabb_basic.rigy.yaml",
+      "expected_output": "outputs/H110_box_aabb_basic.glb",
+      "expected_sha256": "f739fd8246c950970a6768f1c1649f81185be73d3da06c56c44c26e7fbfd741f",
+      "description": "Box with AABB syntax: min/max converted to dimensions+translation"
+    },
+    {
+      "id": "H111_box_decompose_single_cutout",
+      "category": "H",
+      "type": "positive",
+      "input": "inputs/H111_box_decompose_single_cutout.rigy.yaml",
+      "expected_output": "outputs/H111_box_decompose_single_cutout.glb",
+      "expected_sha256": "8a002b7088eedd15a43c887206fe601e0c762b66fe721de342153c175cdee32c",
+      "description": "Box decompose macro with a single cutout"
+    },
+    {
+      "id": "H112_box_decompose_multi_cutout",
+      "category": "H",
+      "type": "positive",
+      "input": "inputs/H112_box_decompose_multi_cutout.rigy.yaml",
+      "expected_output": "outputs/H112_box_decompose_multi_cutout.glb",
+      "expected_sha256": "095b8a81e090e38f23e7ff40642ee2cfbffc1f895a035d064eefb81365ed1eb8",
+      "description": "Box decompose macro with multiple cutouts"
+    },
+    {
+      "id": "F114_macro_id_collision",
+      "category": "F",
+      "type": "negative",
+      "input": "inputs/F114_macro_id_collision.rigy.yaml",
+      "expected_error_type": "ValidationError",
+      "description": "Box decompose generates ID that collides with user primitive"
+    },
+    {
+      "id": "F115_aabb_with_transform",
+      "category": "F",
+      "type": "negative",
+      "input": "inputs/F115_aabb_with_transform.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Box with both aabb and transform (F115)"
+    },
+    {
+      "id": "F116_invalid_cutout_id",
+      "category": "F",
+      "type": "negative",
+      "input": "inputs/F116_invalid_cutout_id.rigy.yaml",
+      "expected_error_type": "ParseError",
+      "description": "Box decompose cutout with digit-leading id (F116)"
     }
   ]
 }

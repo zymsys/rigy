@@ -432,3 +432,317 @@ class TestCombined:
         preprocess(data)
         assert data["value"] == original_value
         assert "params" in data  # original not mutated
+
+
+class TestAabbExpansion:
+    def test_basic_conversion(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "aabb": {"min": [0, 0, 0], "max": [2, 1, 3]},
+                        }
+                    ],
+                }
+            ],
+        }
+        result = preprocess(data)
+        prim = result["meshes"][0]["primitives"][0]
+        assert "aabb" not in prim
+        assert prim["dimensions"] == {"width": 2.0, "height": 1.0, "depth": 3.0}
+        assert prim["transform"]["translation"] == [1.0, 0.5, 1.5]
+
+    def test_aabb_with_dimensions_rejected(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "aabb": {"min": [0, 0, 0], "max": [1, 1, 1]},
+                            "dimensions": {"width": 1, "height": 1, "depth": 1},
+                        }
+                    ],
+                }
+            ],
+        }
+        with pytest.raises(ParseError, match="mutually exclusive"):
+            preprocess(data)
+
+    def test_f115_aabb_with_transform(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "aabb": {"min": [0, 0, 0], "max": [1, 1, 1]},
+                            "transform": {"translation": [1, 0, 0]},
+                        }
+                    ],
+                }
+            ],
+        }
+        with pytest.raises(ParseError, match="F115"):
+            preprocess(data)
+
+    def test_min_ge_max_rejected(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "aabb": {"min": [0, 0, 0], "max": [0, 1, 1]},
+                        }
+                    ],
+                }
+            ],
+        }
+        with pytest.raises(ParseError, match="must be >"):
+            preprocess(data)
+
+
+class TestBoxDecomposeExpansion:
+    def test_single_cutout(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "south",
+                            "mesh": "walls",
+                            "axis": "x",
+                            "span": [0.0, 8.0],
+                            "base_y": 0.0,
+                            "height": 2.7,
+                            "thickness": 0.2,
+                            "cutouts": [
+                                {
+                                    "id": "door",
+                                    "span": [3.5, 4.5],
+                                    "bottom": 0.0,
+                                    "top": 2.1,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        result = preprocess(data)
+        prims = result["meshes"][0]["primitives"]
+        ids = [p["id"] for p in prims]
+        # Should have gap segments + above (no below since bottom=0)
+        assert "south_gap_0" in ids
+        assert "south_gap_1" in ids
+        assert "south_door_above" in ids
+        assert "south_door_below" not in ids
+        # All should be boxes
+        for p in prims:
+            assert p["type"] == "box"
+
+    def test_multiple_cutouts(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "wall",
+                            "mesh": "walls",
+                            "axis": "x",
+                            "span": [0.0, 10.0],
+                            "base_y": 0.0,
+                            "height": 3.0,
+                            "thickness": 0.2,
+                            "cutouts": [
+                                {
+                                    "id": "door",
+                                    "span": [2.0, 3.0],
+                                    "bottom": 0.0,
+                                    "top": 2.1,
+                                },
+                                {
+                                    "id": "win",
+                                    "span": [6.0, 8.0],
+                                    "bottom": 0.8,
+                                    "top": 2.0,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        result = preprocess(data)
+        prims = result["meshes"][0]["primitives"]
+        ids = [p["id"] for p in prims]
+        assert "wall_door_above" in ids
+        assert "wall_win_below" in ids
+        assert "wall_win_above" in ids
+
+    def test_no_cutouts(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "wall",
+                            "mesh": "walls",
+                            "axis": "x",
+                            "span": [0.0, 5.0],
+                            "base_y": 0.0,
+                            "height": 2.5,
+                            "thickness": 0.2,
+                        }
+                    ],
+                }
+            ],
+        }
+        result = preprocess(data)
+        prims = result["meshes"][0]["primitives"]
+        assert len(prims) == 1
+        assert prims[0]["id"] == "wall_gap_0"
+        assert prims[0]["dimensions"]["width"] == 5.0
+
+    def test_overlapping_cutouts_rejected(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "wall",
+                            "mesh": "walls",
+                            "axis": "x",
+                            "span": [0.0, 10.0],
+                            "base_y": 0.0,
+                            "height": 3.0,
+                            "thickness": 0.2,
+                            "cutouts": [
+                                {"id": "a", "span": [2.0, 5.0], "bottom": 0.0, "top": 2.0},
+                                {"id": "b", "span": [4.0, 7.0], "bottom": 0.0, "top": 2.0},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        with pytest.raises(ParseError, match="overlap"):
+            preprocess(data)
+
+    def test_tag_inheritance(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "wall",
+                            "mesh": "walls",
+                            "axis": "x",
+                            "span": [0.0, 8.0],
+                            "base_y": 0.0,
+                            "height": 2.7,
+                            "thickness": 0.2,
+                            "tags": ["exterior"],
+                            "cutouts": [
+                                {
+                                    "id": "win",
+                                    "span": [3.0, 5.0],
+                                    "bottom": 0.8,
+                                    "top": 2.0,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        result = preprocess(data)
+        prims = result["meshes"][0]["primitives"]
+        # All segments inherit macro tags
+        for p in prims:
+            assert "exterior" in p.get("tags", [])
+
+    def test_axis_z(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "wall",
+                            "mesh": "walls",
+                            "axis": "z",
+                            "span": [0.0, 5.0],
+                            "base_y": 0.0,
+                            "height": 2.5,
+                            "thickness": 0.2,
+                        }
+                    ],
+                }
+            ],
+        }
+        result = preprocess(data)
+        prims = result["meshes"][0]["primitives"]
+        p = prims[0]
+        # axis=z: depth is along Z, width is thickness
+        assert p["dimensions"]["depth"] == 5.0
+        assert p["dimensions"]["width"] == 0.2
+
+    def test_f116_invalid_cutout_id(self):
+        data = {
+            "version": "0.11",
+            "meshes": [
+                {
+                    "id": "walls",
+                    "primitives": [
+                        {
+                            "macro": "box_decompose",
+                            "id": "wall",
+                            "mesh": "walls",
+                            "axis": "x",
+                            "span": [0.0, 5.0],
+                            "base_y": 0.0,
+                            "height": 2.5,
+                            "thickness": 0.2,
+                            "cutouts": [
+                                {"id": "0bad", "span": [1.0, 2.0], "bottom": 0.0, "top": 1.0}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        with pytest.raises(ParseError, match="F116"):
+            preprocess(data)

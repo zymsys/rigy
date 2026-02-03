@@ -352,6 +352,16 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **Conformance fixtures** — Three positive test cases (Q01–Q03) covering params, repeat, and combined usage. Eleven negative test cases (Q04–Q14) covering all V56–V66 error codes.
 
+### v0.11 — AABB syntax, box decomposition macro & semantic tags
+
+**AABB box syntax** — Boxes can be defined with `aabb: {min: [x,y,z], max: [x,y,z]}` instead of `dimensions` + `transform`. The preprocessor converts min/max to centered dimensions and a translation. Mutually exclusive with `dimensions`; rejected if combined with `transform` (F115).
+
+**`box_decompose` macro** — A preprocessing macro that decomposes a box span with cutouts into box primitives. Specify `axis` (x|z), `span`, `height`, `thickness`, and a list of `cutouts` (each with `id`, `span`, `bottom`, `top`). The macro emits full-height gap segments between cutouts, plus below/above boxes around each cutout. Supports `tags`, `surface`, and `material` inheritance. Cutout IDs must be valid identifiers (F116); overlapping cutouts are rejected.
+
+**Semantic `tags`** — Primitives can declare `tags: [str, ...]`, an ordered list of non-geometric string labels. Tags from all primitives in a mesh are collected (deduplicated, order-preserving) and exported as `rigy_tags` in the glTF primitive's `extras` object. Version-gated to >= 0.11.
+
+**Conformance fixtures** — Three positive test cases (H110–H112) covering AABB, box_decompose with single cutout, and box_decompose with multiple cutouts. Three negative test cases (F114–F116) covering macro ID collision, AABB with transform, and invalid cutout ID.
+
 ### Rigs v0.1 — Scene composition
 
 A separate `.rigs.yaml` format that composes multiple Rigy assets into a single glTF scene. Deterministic, no scripting, no arbitrary transforms.
@@ -380,7 +390,7 @@ Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in 
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, [`spec/rigy_spec_v0.10_amendment_rc1.md`](spec/rigy_spec_v0.10_amendment_rc1.md) for the v0.10 preprocessing amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, [`spec/rigy_spec_v0.10_amendment_rc1.md`](spec/rigy_spec_v0.10_amendment_rc1.md) for the v0.10 preprocessing amendment, [`spec/rigy_spec_v0.11-amendment-rc2.md`](spec/rigy_spec_v0.11-amendment-rc2.md) for the v0.11 AABB/macros/tags amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
 
 ## Development
 

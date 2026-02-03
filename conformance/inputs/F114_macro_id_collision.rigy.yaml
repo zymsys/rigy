@@ -1,0 +1,19 @@
+version: "0.11"
+units: meters
+meshes:
+  - id: walls
+    primitives:
+      - macro: box_decompose
+        id: wall
+        mesh: walls
+        axis: x
+        span: [0.0, 8.0]
+        base_y: 0.0
+        height: 2.7
+        thickness: 0.2
+      - type: box
+        id: wall_gap_0
+        dimensions:
+          x: 1
+          y: 1
+          z: 1

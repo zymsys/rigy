@@ -332,6 +332,18 @@ def _build_gltf_baked(
             material=mat_idx,
         )
 
+        # Export rigy_tags as glTF extras (baked path)
+        all_tags_baked: list[str] = []
+        seen_tags_baked: set[str] = set()
+        for prim in mesh_def.primitives:
+            if prim.tags:
+                for tag in prim.tags:
+                    if tag not in seen_tags_baked:
+                        all_tags_baked.append(tag)
+                        seen_tags_baked.add(tag)
+        if all_tags_baked:
+            gltf_prim.extras = {"rigy_tags": all_tags_baked}
+
         mesh_idx = len(gltf.meshes)
         mesh_name = mesh_def.name or mesh_def.id
         gltf.meshes.append(pygltflib.Mesh(name=mesh_name, primitives=[gltf_prim]))
@@ -747,6 +759,18 @@ def _build_spec_meshes(
             indices=idx_acc_idx,
             material=mat_idx,
         )
+
+        # Export rigy_tags as glTF extras
+        all_tags: list[str] = []
+        seen_tags: set[str] = set()
+        for prim in mesh_def.primitives:
+            if prim.tags:
+                for tag in prim.tags:
+                    if tag not in seen_tags:
+                        all_tags.append(tag)
+                        seen_tags.add(tag)
+        if all_tags:
+            gltf_prim.extras = {"rigy_tags": all_tags}
 
         mesh_idx = len(gltf.meshes)
         mesh_name = name_prefix + (mesh_def.name or mesh_def.id)

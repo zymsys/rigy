@@ -129,5 +129,5 @@ def _check_version(version: str) -> None:
     except ValueError:
         raise ParseError(f"Invalid version format: {version!r}")
 
-    if (major, minor) > (0, 10):
-        raise ParseError(f"Unsupported version: {version!r} (latest supported is 0.10)")
+    if (major, minor) > (0, 11):
+        raise ParseError(f"Unsupported version: {version!r} (latest supported is 0.11)")

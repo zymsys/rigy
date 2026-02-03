@@ -23,6 +23,7 @@ def validate(spec: RigySpec) -> None:
         ValidationError: On any semantic rule violation.
     """
     _check_wedge_version_gate(spec)
+    _check_tags_version_gate(spec)
     _check_material_base_color_length(spec)
     _check_material_base_color_range(spec)
     _check_material_refs(spec)
@@ -72,6 +73,22 @@ def _check_wedge_version_gate(spec: RigySpec) -> None:
             if prim.type == "wedge":
                 raise ValidationError(
                     f"Primitive {prim.id!r} uses type 'wedge' which requires version >= 0.9, "
+                    f"but spec declares version {spec.version!r}"
+                )
+
+
+def _check_tags_version_gate(spec: RigySpec) -> None:
+    """Reject tags in specs with version < 0.11."""
+    parts = spec.version.split(".")
+    if len(parts) == 2:
+        major, minor = int(parts[0]), int(parts[1])
+        if (major, minor) >= (0, 11):
+            return
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            if prim.tags:
+                raise ValidationError(
+                    f"Primitive {prim.id!r} uses 'tags' which requires version >= 0.11, "
                     f"but spec declares version {spec.version!r}"
                 )
 
@@ -612,9 +629,7 @@ def _check_uv_set_generator_required(spec: RigySpec) -> None:
             continue
         for key, entry in mesh.uv_sets.items():
             if not entry.generator:
-                raise ValidationError(
-                    f"Mesh {mesh.id!r}: UV set {key!r} has empty generator"
-                )
+                raise ValidationError(f"Mesh {mesh.id!r}: UV set {key!r} has empty generator")
 
 
 def _check_uv_set_generator_vocabulary(spec: RigySpec) -> None:
@@ -652,9 +667,7 @@ def _check_uv_roles_requires_uv_sets(spec: RigySpec) -> None:
     """V53: uv_roles present → uv_sets must also be present."""
     for mesh in spec.meshes:
         if mesh.uv_roles is not None and mesh.uv_sets is None:
-            raise ValidationError(
-                f"Mesh {mesh.id!r}: uv_roles is present but uv_sets is missing"
-            )
+            raise ValidationError(f"Mesh {mesh.id!r}: uv_roles is present but uv_sets is missing")
 
 
 def _check_uv_role_set_declared(spec: RigySpec) -> None:
@@ -668,8 +681,7 @@ def _check_uv_role_set_declared(spec: RigySpec) -> None:
         for role, entry in mesh.uv_roles.items():
             if entry.set not in mesh.uv_sets:
                 raise ValidationError(
-                    f"Mesh {mesh.id!r}: UV role {role!r} references undeclared "
-                    f"UV set {entry.set!r}"
+                    f"Mesh {mesh.id!r}: UV role {role!r} references undeclared UV set {entry.set!r}"
                 )
 
 
@@ -690,7 +702,7 @@ def _check_uv_set_contiguous(spec: RigySpec) -> None:
         expected = list(range(len(indices)))
         if indices != expected:
             raise ValidationError(
-                f"Mesh {mesh.id!r}: UV set keys must be contiguous uv0..uv{len(indices)-1}, "
+                f"Mesh {mesh.id!r}: UV set keys must be contiguous uv0..uv{len(indices) - 1}, "
                 f"got {sorted(mesh.uv_sets.keys())}"
             )
 

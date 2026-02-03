@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.10 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.11 specs."""
 
 from __future__ import annotations
 
@@ -8,17 +8,26 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-UV_ROLE_VOCABULARY: frozenset[str] = frozenset({
-    "albedo", "detail", "directional", "radial", "decal", "lightmap",
-})
+UV_ROLE_VOCABULARY: frozenset[str] = frozenset(
+    {
+        "albedo",
+        "detail",
+        "directional",
+        "radial",
+        "decal",
+        "lightmap",
+    }
+)
 
-UV_GENERATOR_VOCABULARY: frozenset[str] = frozenset({
-    "planar_xy@1",
-    "box_project@1",
-    "sphere_latlong@1",
-    "cylindrical@1",
-    "capsule_cyl_latlong@1",
-})
+UV_GENERATOR_VOCABULARY: frozenset[str] = frozenset(
+    {
+        "planar_xy@1",
+        "box_project@1",
+        "sphere_latlong@1",
+        "cylindrical@1",
+        "capsule_cyl_latlong@1",
+    }
+)
 
 UV_GENERATOR_APPLICABILITY: dict[str, frozenset[str]] = {
     "planar_xy@1": frozenset({"box", "sphere", "cylinder", "capsule", "wedge"}),
@@ -63,6 +72,8 @@ class Primitive(BaseModel):
     dimensions: dict[str, float]
     transform: Transform | None = None
     material: str | None = None
+    surface: str | None = None
+    tags: list[str] | None = None
 
     @field_validator("dimensions")
     @classmethod

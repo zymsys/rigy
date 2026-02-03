@@ -196,6 +196,86 @@ class TestUvExport:
         assert prim.attributes.TEXCOORD_0 is None
 
 
+class TestTagsExport:
+    def test_tags_exported_as_extras(self, tmp_path):
+        spec = RigySpec(
+            version="0.11",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "tags": ["wall", "exterior"],
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        prim = gltf.meshes[0].primitives[0]
+        assert prim.extras is not None
+        assert prim.extras["rigy_tags"] == ["wall", "exterior"]
+
+    def test_no_tags_no_extras(self, tmp_path):
+        spec = RigySpec(
+            version="0.11",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        prim = gltf.meshes[0].primitives[0]
+        assert not prim.extras or "rigy_tags" not in prim.extras
+
+    def test_tags_deduplicated_across_primitives(self, tmp_path):
+        spec = RigySpec(
+            version="0.11",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "tags": ["wall", "exterior"],
+                        },
+                        {
+                            "type": "box",
+                            "id": "p2",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "tags": ["exterior", "load_bearing"],
+                        },
+                    ],
+                }
+            ],
+        )
+        validate(spec)
+        out = tmp_path / "test.glb"
+        export_gltf(spec, out)
+        gltf = pygltflib.GLTF2().load(str(out))
+        prim = gltf.meshes[0].primitives[0]
+        assert prim.extras["rigy_tags"] == ["wall", "exterior", "load_bearing"]
+
+
 def _make_material_spec(**overrides):
     base = {
         "version": "0.6",

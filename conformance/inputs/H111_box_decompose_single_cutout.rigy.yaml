@@ -1,0 +1,18 @@
+version: "0.11"
+units: meters
+meshes:
+  - id: walls
+    primitives:
+      - macro: box_decompose
+        id: south
+        mesh: walls
+        axis: x
+        span: [0.0, 8.0]
+        base_y: 0.0
+        height: 2.7
+        thickness: 0.2
+        cutouts:
+          - id: door
+            span: [3.5, 4.5]
+            bottom: 0.0
+            top: 2.1

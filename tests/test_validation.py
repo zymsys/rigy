@@ -1392,6 +1392,65 @@ meshes:
             validate(spec)
 
 
+class TestTagsVersionGate:
+    def test_tags_on_v010_rejected(self):
+        spec = _make_spec(
+            version="0.10",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "tags": ["wall"],
+                        }
+                    ],
+                }
+            ],
+        )
+        with pytest.raises(ValidationError, match="tags.*requires version >= 0.11"):
+            validate(spec)
+
+    def test_tags_on_v011_accepted(self):
+        spec = _make_spec(
+            version="0.11",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                            "tags": ["wall"],
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+    def test_no_tags_on_old_version_ok(self):
+        spec = _make_spec(
+            version="0.10",
+            meshes=[
+                {
+                    "id": "m1",
+                    "primitives": [
+                        {
+                            "type": "box",
+                            "id": "p1",
+                            "dimensions": {"x": 1, "y": 1, "z": 1},
+                        }
+                    ],
+                }
+            ],
+        )
+        validate(spec)  # should not raise
+
+
 class TestUvSetValidation:
     def test_v50_empty_generator_rejected_by_pydantic(self):
         """V50: Pydantic enforces generator is required; empty string caught by validation."""
