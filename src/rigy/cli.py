@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import click
@@ -12,6 +13,12 @@ from rigy.composition import resolve_composition
 from rigy.errors import RigyError
 from rigy.expanded_yaml import render_expanded_yaml
 from rigy.exporter import export_baked_gltf, export_gltf
+from rigy.inspection import (
+    has_failed_intent_checks,
+    inspect_spec,
+    render_text as render_inspection_text,
+    validate_selected_primitive_ids,
+)
 from rigy.parser import parse_with_imports
 from rigy.symmetry import expand_symmetry
 from rigy.validation import validate, validate_composition
@@ -158,6 +165,108 @@ def compile(
     except RigyError as e:
         if emit_on_error and expanded_yaml_text is not None and emit_expanded_yaml is not None:
             _write_expanded_yaml(expanded_yaml_text, emit_expanded_yaml)
+        raise click.ClickException(str(e))
+
+
+@main.command()
+@click.argument("input_file", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Inspection output format.",
+)
+@click.option(
+    "--expanded",
+    is_flag=True,
+    default=False,
+    help="Also emit expanded YAML diagnostics.",
+)
+@click.option(
+    "--primitive",
+    "primitive_ids",
+    multiple=True,
+    help="Restrict output to selected primitive id(s). May be repeated.",
+)
+@click.option(
+    "--pairwise-gaps",
+    is_flag=True,
+    default=False,
+    help="Compute pairwise AABB gap/overlap diagnostics.",
+)
+@click.option(
+    "--intent-checks",
+    is_flag=True,
+    default=False,
+    help="Evaluate intent checks when configured (tooling-level).",
+)
+@click.option(
+    "--fail-on-intent",
+    is_flag=True,
+    default=False,
+    help="Exit with code 3 if any intent check fails.",
+)
+def inspect(
+    input_file: Path,
+    output_format: str = "text",
+    expanded: bool = False,
+    primitive_ids: tuple[str, ...] = (),
+    pairwise_gaps: bool = False,
+    intent_checks: bool = False,
+    fail_on_intent: bool = False,
+) -> None:
+    """Inspect Rigy geometry without exporting GLB."""
+    if _is_rigs_file(input_file):
+        raise click.UsageError("inspect currently supports only .rigy.yaml inputs")
+    if fail_on_intent and not intent_checks:
+        raise click.UsageError("--fail-on-intent requires --intent-checks")
+
+    expanded_yaml_text: str | None = None
+    if expanded:
+        try:
+            expanded_yaml_text = render_expanded_yaml(input_file)
+        except RigyError as e:
+            raise click.ClickException(str(e))
+
+    try:
+        asset = parse_with_imports(input_file)
+        asset.spec = expand_symmetry(asset.spec)
+        validate(asset.spec)
+
+        for imported in asset.imported_assets.values():
+            imported.spec = expand_symmetry(imported.spec)
+        if asset.spec.instances:
+            validate_composition(asset)
+
+        selected_primitive_ids = set(primitive_ids)
+        unknown_ids = validate_selected_primitive_ids(asset.spec, selected_primitive_ids)
+        if unknown_ids:
+            raise click.UsageError(
+                "Unknown primitive id(s): " + ", ".join(repr(prim_id) for prim_id in unknown_ids)
+            )
+
+        payload = inspect_spec(
+            asset.spec,
+            selected_primitive_ids=selected_primitive_ids or None,
+            pairwise_gaps=pairwise_gaps,
+            include_intent_checks=intent_checks,
+        )
+
+        if expanded_yaml_text is not None:
+            payload["expanded_yaml"] = expanded_yaml_text
+
+        if output_format == "json":
+            output_text = json.dumps(payload, indent=2)
+            click.echo(output_text)
+        else:
+            output_text = render_inspection_text(payload, expanded_yaml=expanded_yaml_text)
+            click.echo(output_text, nl=False)
+
+        if fail_on_intent and has_failed_intent_checks(payload):
+            raise click.exceptions.Exit(3)
+    except RigyError as e:
         raise click.ClickException(str(e))
 
 

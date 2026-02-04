@@ -28,6 +28,9 @@ rigy compile humanoid.rigy.yaml  # outputs humanoid.glb
 rigy compile scene.rigs.yaml -o scene.glb  # Rigs scene composition
 rigy compile house.rigy.yaml --emit-expanded-yaml expanded.yaml
 rigy compile house.rigy.yaml --emit-expanded-yaml - --emit-comments=provenance
+rigy inspect house.rigy.yaml
+rigy inspect house.rigy.yaml --format json --pairwise-gaps
+rigy inspect house.rigy.yaml --primitive wall_a --primitive wall_b --pairwise-gaps
 ```
 
 The CLI auto-detects `.rigs.yaml` files and routes to the Rigs composition pipeline.
@@ -36,6 +39,8 @@ The CLI auto-detects `.rigs.yaml` files and routes to the Rigs composition pipel
 - `keep` (default): keep author comments and add synthetic provenance comments
 - `drop`: emit without comments
 - `provenance`: emit only synthetic provenance comments
+
+`rigy inspect` runs the parse/validate/tessellate pipeline and reports deterministic geometry diagnostics without exporting GLB. It supports text or JSON output (`--format json`), primitive filtering (`--primitive`), optional pairwise AABB gaps (`--pairwise-gaps`), and optional expanded YAML emission (`--expanded`). `inspect` currently accepts `.rigy.yaml` inputs only.
 
 ### Library
 
@@ -368,6 +373,8 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 **Semantic `tags`** — Primitives can declare `tags: [str, ...]`, an ordered list of non-geometric string labels. Tags from all primitives in a mesh are collected (deduplicated, order-preserving) and exported as `rigy_tags` in the glTF primitive's `extras` object. Version-gated to >= 0.11.
 
 **Expanded YAML emission (tooling)** — `rigy compile` can emit the expanded pre-validation YAML via `--emit-expanded-yaml`. Emission is observational only (does not alter validation or GLB bytes), canonicalizes emitted rotations to `rotation_degrees`, and supports comment modes (`keep`, `drop`, `provenance`) plus `--emit-on-error`.
+
+**Geometry inspection (tooling)** — `rigy inspect` reports model bounds, per-primitive AABBs/centers/extents, face normals/planes for surface-key primitives, and optional pairwise AABB gap/overlap metrics. Inspection is observational only and does not affect validation outcomes or GLB bytes.
 
 **Conformance fixtures** — Three positive test cases (H110–H112) covering AABB, box_decompose with single cutout, and box_decompose with multiple cutouts. Three negative test cases (F114–F116) covering macro ID collision, AABB with transform, and invalid cutout ID.
 

@@ -1,5 +1,7 @@
 """Tests for CLI entry point."""
 
+import json
+
 from click.testing import CliRunner
 
 from rigy.cli import main
@@ -262,3 +264,146 @@ meshes:
         )
         assert result.exit_code != 0
         assert "only supported for .rigy.yaml inputs" in result.output
+
+    def test_inspect_text_success(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_text.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: wall
+        dimensions: { x: 2, y: 4, z: 6 }
+"""
+        )
+
+        result = runner.invoke(main, ["inspect", str(input_file)])
+        assert result.exit_code == 0, result.output
+        assert "summary:" in result.output
+        assert "primitive_count: 1" in result.output
+        assert "id: wall" in result.output
+        assert "surface_key: +x" in result.output
+
+    def test_inspect_json_with_pairwise_gaps(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_pairs.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: a
+        dimensions: { x: 1, y: 1, z: 1 }
+      - type: box
+        id: b
+        dimensions: { x: 1, y: 1, z: 1 }
+        transform: { translation: [2, 0, 0] }
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["inspect", str(input_file), "--format", "json", "--pairwise-gaps"],
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["summary"]["mesh_count"] == 1
+        assert payload["summary"]["primitive_count"] == 2
+        assert [p["id"] for p in payload["primitives"]] == ["a", "b"]
+        assert len(payload["faces"]) == 12
+        assert len(payload["pairs"]) == 1
+        gap = payload["pairs"][0]["gap"]
+        assert gap["x"] == 1.0
+        assert gap["y"] == -1.0
+        assert gap["z"] == -1.0
+        assert gap["overall"] == 1.0
+
+    def test_inspect_unknown_primitive_filter(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_filter.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: a
+        dimensions: { x: 1, y: 1, z: 1 }
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["inspect", str(input_file), "--primitive", "missing"],
+        )
+        assert result.exit_code == 2
+        assert "Unknown primitive id(s)" in result.output
+
+    def test_inspect_fail_on_intent_requires_intent_checks(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_intent.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: a
+        dimensions: { x: 1, y: 1, z: 1 }
+"""
+        )
+
+        result = runner.invoke(main, ["inspect", str(input_file), "--fail-on-intent"])
+        assert result.exit_code == 2
+        assert "--fail-on-intent requires --intent-checks" in result.output
+
+    def test_inspect_rejects_rigs_files(self, tmp_path):
+        runner = CliRunner()
+        rigs_file = tmp_path / "scene.rigs.yaml"
+        rigs_file.write_text("rigs_version: '0.1'\nimports: {}\nscene:\n  base: x\n")
+
+        result = runner.invoke(main, ["inspect", str(rigs_file)])
+        assert result.exit_code == 2
+        assert "supports only .rigy.yaml inputs" in result.output
+
+    def test_inspect_json_with_expanded_yaml(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_expanded.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+params:
+  size: 1.25
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions:
+          x: $size
+          y: 1
+          z: 1
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["inspect", str(input_file), "--format", "json", "--expanded"],
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert "expanded_yaml" in payload
+        assert "params:" not in payload["expanded_yaml"]
+        assert "x: 1.25" in payload["expanded_yaml"]
