@@ -26,9 +26,16 @@ Requires Python 3.12+.
 rigy compile humanoid.rigy.yaml -o humanoid.glb
 rigy compile humanoid.rigy.yaml  # outputs humanoid.glb
 rigy compile scene.rigs.yaml -o scene.glb  # Rigs scene composition
+rigy compile house.rigy.yaml --emit-expanded-yaml expanded.yaml
+rigy compile house.rigy.yaml --emit-expanded-yaml - --emit-comments=provenance
 ```
 
 The CLI auto-detects `.rigs.yaml` files and routes to the Rigs composition pipeline.
+
+`--emit-expanded-yaml <path|->` emits the post-preprocessing Rigy YAML (after `repeat`, `params`, `aabb`, and `box_decompose`, before schema validation). Use `--emit-on-error` to still emit when later validation/export fails. `--emit-comments` controls comments in emitted YAML:
+- `keep` (default): keep author comments and add synthetic provenance comments
+- `drop`: emit without comments
+- `provenance`: emit only synthetic provenance comments
 
 ### Library
 
@@ -359,6 +366,8 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 **`box_decompose` macro** — A preprocessing macro that decomposes a box span with cutouts into box primitives. Specify `axis` (x|z), `span`, `height`, `thickness`, and a list of `cutouts` (each with `id`, `span`, `bottom`, `top`). The macro emits full-height gap segments between cutouts, plus below/above boxes around each cutout. Supports `tags`, `surface`, and `material` inheritance. Cutout IDs must be valid identifiers (F116); overlapping cutouts are rejected.
 
 **Semantic `tags`** — Primitives can declare `tags: [str, ...]`, an ordered list of non-geometric string labels. Tags from all primitives in a mesh are collected (deduplicated, order-preserving) and exported as `rigy_tags` in the glTF primitive's `extras` object. Version-gated to >= 0.11.
+
+**Expanded YAML emission (tooling)** — `rigy compile` can emit the expanded pre-validation YAML via `--emit-expanded-yaml`. Emission is observational only (does not alter validation or GLB bytes), canonicalizes emitted rotations to `rotation_degrees`, and supports comment modes (`keep`, `drop`, `provenance`) plus `--emit-on-error`.
 
 **Conformance fixtures** — Three positive test cases (H110–H112) covering AABB, box_decompose with single cutout, and box_decompose with multiple cutouts. Three negative test cases (F114–F116) covering macro ID collision, AABB with transform, and invalid cutout ID.
 

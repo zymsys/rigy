@@ -19,27 +19,38 @@ _INDEX_TOKEN_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _UNRESOLVED_TOKEN_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")
 
 
-def preprocess(data: dict) -> dict:
+def preprocess(data: dict, add_provenance_comments: bool = False) -> dict:
     """Entry point. Deep-copies data, expands repeats, substitutes params,
     strips the params key, checks for unresolved tokens, then expands
     AABB and macros."""
     data = copy.deepcopy(data)
-    _expand_repeats(data)
+    _expand_repeats(data, add_provenance_comments=add_provenance_comments)
 
     # Validate and substitute params
     raw_params = data.get("params")
     if raw_params is not None:
         params = _validate_params(raw_params)
-        _substitute_params(data, params)
+        _substitute_params(data, params, add_provenance_comments=add_provenance_comments)
         del data["params"]
     else:
         # Even without params, check for stray $param references
-        _substitute_params(data, {})
+        _substitute_params(data, {}, add_provenance_comments=add_provenance_comments)
 
     _check_no_unresolved_tokens(data)
-    _expand_aabb(data)
-    _expand_macros(data)
+    _expand_aabb(data, add_provenance_comments=add_provenance_comments)
+    _expand_macros(data, add_provenance_comments=add_provenance_comments)
     return data
+
+
+def _add_provenance_comment(container: object, key_or_idx: object, comment: str) -> None:
+    """Best-effort helper for ruamel comment-capable containers."""
+    yaml_add_eol_comment = getattr(container, "yaml_add_eol_comment", None)
+    if callable(yaml_add_eol_comment):
+        try:
+            yaml_add_eol_comment(comment, key_or_idx)
+        except Exception:
+            # Keep preprocessing behavior stable even if comment attachment fails.
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -47,11 +58,11 @@ def preprocess(data: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _expand_repeats(obj: object) -> None:
+def _expand_repeats(obj: object, add_provenance_comments: bool = False) -> None:
     """Recursive walk. In any list, detect repeat macros and expand in-place."""
     if isinstance(obj, dict):
         for value in obj.values():
-            _expand_repeats(value)
+            _expand_repeats(value, add_provenance_comments=add_provenance_comments)
     elif isinstance(obj, list):
         i = 0
         while i < len(obj):
@@ -63,14 +74,22 @@ def _expand_repeats(obj: object) -> None:
                 for idx in range(count):
                     instance = copy.deepcopy(body)
                     _substitute_index_token(instance, token_name, idx)
+                    if add_provenance_comments and isinstance(instance, dict):
+                        comment_key = "id" if "id" in instance else next(iter(instance), None)
+                        if comment_key is not None:
+                            _add_provenance_comment(
+                                instance,
+                                comment_key,
+                                f"from repeat: as={token_name} index={idx}",
+                            )
                     expanded.append(instance)
                 obj[i : i + 1] = expanded
                 # Recurse into newly expanded items
                 for e in expanded:
-                    _expand_repeats(e)
+                    _expand_repeats(e, add_provenance_comments=add_provenance_comments)
                 i += len(expanded)
             else:
-                _expand_repeats(item)
+                _expand_repeats(item, add_provenance_comments=add_provenance_comments)
                 i += 1
 
 
@@ -160,7 +179,12 @@ def _validate_params(raw: object) -> dict:
     return params
 
 
-def _substitute_params(obj: object, params: dict, _skip_params_key: bool = True) -> object:
+def _substitute_params(
+    obj: object,
+    params: dict,
+    _skip_params_key: bool = True,
+    add_provenance_comments: bool = False,
+) -> object:
     """Recursive walk. Substitute $param references with values.
 
     Returns the substituted value. Mutates dicts/lists in-place.
@@ -183,11 +207,32 @@ def _substitute_params(obj: object, params: dict, _skip_params_key: bool = True)
         for key in list(obj.keys()):
             if _skip_params_key and key == "params":
                 continue
-            obj[key] = _substitute_params(obj[key], params, _skip_params_key=False)
+            original = obj[key]
+            substituted = _substitute_params(
+                original,
+                params,
+                _skip_params_key=False,
+                add_provenance_comments=add_provenance_comments,
+            )
+            obj[key] = substituted
+            if add_provenance_comments and isinstance(original, str):
+                m = _PARAM_REF_RE.match(original)
+                if m:
+                    _add_provenance_comment(obj, key, f"was ${m.group(1)}")
         return obj
     elif isinstance(obj, list):
         for i, item in enumerate(obj):
-            obj[i] = _substitute_params(item, params, _skip_params_key=False)
+            substituted = _substitute_params(
+                item,
+                params,
+                _skip_params_key=False,
+                add_provenance_comments=add_provenance_comments,
+            )
+            obj[i] = substituted
+            if add_provenance_comments and isinstance(item, str):
+                m = _PARAM_REF_RE.match(item)
+                if m:
+                    _add_provenance_comment(obj, i, f"was ${m.group(1)}")
         return obj
     return obj
 
@@ -210,7 +255,7 @@ def _check_no_unresolved_tokens(obj: object) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _expand_aabb(data: dict) -> None:
+def _expand_aabb(data: dict, add_provenance_comments: bool = False) -> None:
     """Walk meshes[].primitives[] and convert aabb → dimensions + translation."""
     for mesh in data.get("meshes", []):
         if not isinstance(mesh, dict):
@@ -273,6 +318,15 @@ def _expand_aabb(data: dict) -> None:
                     (mn[2] + mx[2]) / 2,
                 ],
             }
+            if add_provenance_comments:
+                _add_provenance_comment(prim, "dimensions", "derived from aabb(min,max)")
+                transform = prim.get("transform")
+                if isinstance(transform, dict) and "translation" in transform:
+                    _add_provenance_comment(
+                        transform,
+                        "translation",
+                        "derived from aabb(min,max)",
+                    )
             del prim["aabb"]
 
 
@@ -281,7 +335,7 @@ def _expand_aabb(data: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _expand_macros(data: dict) -> None:
+def _expand_macros(data: dict, add_provenance_comments: bool = False) -> None:
     """Walk meshes[].primitives[] and expand macro items in-place."""
     for mesh in data.get("meshes", []):
         if not isinstance(mesh, dict):
@@ -296,7 +350,11 @@ def _expand_macros(data: dict) -> None:
             if isinstance(item, dict) and "macro" in item:
                 macro_type = item["macro"]
                 if macro_type == "box_decompose":
-                    expanded = _expand_box_decompose(item, mesh_id)
+                    expanded = _expand_box_decompose(
+                        item,
+                        mesh_id,
+                        add_provenance_comments=add_provenance_comments,
+                    )
                 else:
                     raise ParseError(f"Unknown macro type: {macro_type!r}")
                 prims[i : i + 1] = expanded
@@ -305,7 +363,9 @@ def _expand_macros(data: dict) -> None:
                 i += 1
 
 
-def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
+def _expand_box_decompose(
+    item: dict, mesh_id: str, add_provenance_comments: bool = False
+) -> list[dict]:
     """Expand a box_decompose macro into box primitives."""
     # Extract and validate fields
     box_id = item.get("id")
@@ -405,6 +465,7 @@ def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
 
     def _make_box(
         prim_id: str,
+        segment_label: str,
         along_start: float,
         along_end: float,
         y_bottom: float,
@@ -424,18 +485,27 @@ def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
 
         tags = list(macro_tags)
 
-        prim: dict = {
-            "type": "box",
-            "id": prim_id,
-            "dimensions": dims,
-            "transform": {"translation": translation},
-        }
+        prim: dict = type(item)()
+        prim.update(
+            {
+                "type": "box",
+                "id": prim_id,
+                "dimensions": dims,
+                "transform": {"translation": translation},
+            }
+        )
         if tags:
             prim["tags"] = tags
         if macro_surface is not None:
             prim["surface"] = macro_surface
         if macro_material is not None:
             prim["material"] = macro_material
+        if add_provenance_comments:
+            _add_provenance_comment(
+                prim,
+                "id",
+                f"from box_decompose:{box_id} segment={segment_label}",
+            )
         return prim
 
     # Collect cut points along the box axis from cutout spans
@@ -457,7 +527,7 @@ def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
         )
         if not overlaps_cutout:
             prim_id = f"{box_id}_gap_{gap_idx}"
-            result.append(_make_box(prim_id, seg_start, seg_end, 0.0, height))
+            result.append(_make_box(prim_id, f"gap_{gap_idx}", seg_start, seg_end, 0.0, height))
             gap_idx += 1
 
     # Emit below/above segments for each cutout
@@ -467,6 +537,7 @@ def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
             result.append(
                 _make_box(
                     f"{box_id}_{cut_id}_below",
+                    f"{cut_id}_below",
                     cut["span_start"],
                     cut["span_end"],
                     0.0,
@@ -477,6 +548,7 @@ def _expand_box_decompose(item: dict, mesh_id: str) -> list[dict]:
             result.append(
                 _make_box(
                     f"{box_id}_{cut_id}_above",
+                    f"{cut_id}_above",
                     cut["span_start"],
                     cut["span_end"],
                     cut["top"],

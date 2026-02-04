@@ -10,6 +10,7 @@ from rigy import __version__
 from rigy.composition import bake_transforms as _bake_transforms
 from rigy.composition import resolve_composition
 from rigy.errors import RigyError
+from rigy.expanded_yaml import render_expanded_yaml
 from rigy.exporter import export_baked_gltf, export_gltf
 from rigy.parser import parse_with_imports
 from rigy.symmetry import expand_symmetry
@@ -20,6 +21,19 @@ def _is_rigs_file(path: Path) -> bool:
     """Check if a path is a .rigs.yaml file."""
     name = path.name
     return name.endswith(".rigs.yaml") or name.endswith(".rigs.yml")
+
+
+def _write_expanded_yaml(text: str, destination: str) -> None:
+    """Write expanded YAML either to file path or stdout ('-')."""
+    if destination == "-":
+        click.echo(text, nl=False)
+        return
+
+    output_path = Path(destination)
+    try:
+        output_path.write_text(text, encoding="utf-8")
+    except OSError as e:
+        raise click.ClickException(f"Cannot write expanded YAML to {output_path}: {e}") from e
 
 
 @click.group()
@@ -56,17 +70,51 @@ def main() -> None:
     default=False,
     help="Bake skinning into geometry and remove skin from GLB.",
 )
+@click.option(
+    "--emit-expanded-yaml",
+    "emit_expanded_yaml",
+    type=str,
+    default=None,
+    help="Emit post-preprocessing Rigy YAML to a path, or '-' for stdout.",
+)
+@click.option(
+    "--emit-on-error",
+    is_flag=True,
+    default=False,
+    help="Emit expanded YAML if preprocessing succeeds, even when later validation/export fails.",
+)
+@click.option(
+    "--emit-comments",
+    type=click.Choice(["keep", "drop", "provenance"]),
+    default="keep",
+    show_default=True,
+    help="Comment mode for expanded YAML output.",
+)
 def compile(
     input_file: Path,
     output: Path | None,
     bake_transforms: bool = False,
     pose_id: str | None = None,
     bake_skin: bool = False,
+    emit_expanded_yaml: str | None = None,
+    emit_on_error: bool = False,
+    emit_comments: str = "keep",
 ) -> None:
     """Compile a .rigy.yaml or .rigs.yaml spec to GLB."""
     if _is_rigs_file(input_file):
+        if emit_expanded_yaml is not None:
+            raise click.ClickException(
+                "--emit-expanded-yaml is only supported for .rigy.yaml inputs"
+            )
         _compile_rigs(input_file, output)
         return
+
+    expanded_yaml_text: str | None = None
+    if emit_expanded_yaml is not None:
+        try:
+            expanded_yaml_text = render_expanded_yaml(input_file, emit_comments=emit_comments)
+        except RigyError as e:
+            raise click.ClickException(str(e))
 
     if output is None:
         # Strip .rigy.yaml or .yaml and add .glb
@@ -104,8 +152,12 @@ def compile(
             if bake_transforms:
                 composed = _bake_transforms(composed)
             export_gltf(composed, output, yaml_dir=input_file.parent)
-        click.echo(f"Compiled: {output}")
+        if expanded_yaml_text is not None and emit_expanded_yaml is not None:
+            _write_expanded_yaml(expanded_yaml_text, emit_expanded_yaml)
+        click.echo(f"Compiled: {output}", err=emit_expanded_yaml == "-")
     except RigyError as e:
+        if emit_on_error and expanded_yaml_text is not None and emit_expanded_yaml is not None:
+            _write_expanded_yaml(expanded_yaml_text, emit_expanded_yaml)
         raise click.ClickException(str(e))
 
 

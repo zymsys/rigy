@@ -12,11 +12,76 @@ from rigy.errors import ParseError
 from rigy.models import ResolvedAsset, RigySpec
 
 
-def _make_yaml() -> YAML:
+def _make_yaml(preserve_comments: bool = False) -> YAML:
     """Create a ruamel.yaml safe loader that errors on duplicate keys."""
-    yml = YAML(typ="safe")
+    yml = YAML(typ="rt" if preserve_comments else "safe")
     yml.allow_duplicate_keys = False
     return yml
+
+
+def _read_source_text(source: str | Path) -> str:
+    """Read source YAML content from path or treat input as raw YAML text."""
+    if isinstance(source, Path):
+        try:
+            return source.read_text(encoding="utf-8")
+        except OSError as e:
+            raise ParseError(f"Cannot read file: {e}") from e
+    return source
+
+
+def load_yaml_data(source: str | Path, preserve_comments: bool = False) -> dict:
+    """Load YAML and run top-level shape/version checks, before preprocessing."""
+    text = _read_source_text(source)
+    yml = _make_yaml(preserve_comments=preserve_comments)
+    try:
+        data = yml.load(text)
+    except YAMLError as e:
+        raise ParseError(f"Invalid YAML: {e}") from e
+
+    if not isinstance(data, dict):
+        raise ParseError("Top-level YAML value must be a mapping")
+
+    version = data.get("version")
+    if version is None:
+        raise ParseError("Missing required field: version")
+    _check_version(str(version))
+    return data
+
+
+def strip_yaml_comments(obj: object) -> None:
+    """Remove ruamel round-trip comments recursively (best effort)."""
+    comment_attr = getattr(obj, "ca", None)
+    if comment_attr is not None:
+        if hasattr(comment_attr, "comment"):
+            comment_attr.comment = None
+        items = getattr(comment_attr, "items", None)
+        if items is not None and hasattr(items, "clear"):
+            items.clear()
+        if hasattr(comment_attr, "end"):
+            comment_attr.end = []
+
+    if isinstance(obj, dict):
+        for value in obj.values():
+            strip_yaml_comments(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            strip_yaml_comments(item)
+
+
+def parse_preprocessed_yaml(
+    source: str | Path,
+    preserve_comments: bool = False,
+    strip_comments_before_preprocess: bool = False,
+    add_provenance_comments: bool = False,
+) -> dict:
+    """Load + preprocess YAML, optionally preserving/stripping comments."""
+    data = load_yaml_data(source, preserve_comments=preserve_comments)
+    if strip_comments_before_preprocess:
+        strip_yaml_comments(data)
+
+    from rigy.preprocessing import preprocess
+
+    return preprocess(data, add_provenance_comments=add_provenance_comments)
 
 
 def parse_yaml(source: str | Path) -> RigySpec:
@@ -31,34 +96,7 @@ def parse_yaml(source: str | Path) -> RigySpec:
     Raises:
         ParseError: On YAML syntax errors, schema violations, or version mismatches.
     """
-    if isinstance(source, Path):
-        try:
-            text = source.read_text(encoding="utf-8")
-        except OSError as e:
-            raise ParseError(f"Cannot read file: {e}") from e
-    else:
-        text = source
-
-    yml = _make_yaml()
-    try:
-        data = yml.load(text)
-    except YAMLError as e:
-        raise ParseError(f"Invalid YAML: {e}") from e
-
-    if not isinstance(data, dict):
-        raise ParseError("Top-level YAML value must be a mapping")
-
-    # Version check before Pydantic parsing
-    version = data.get("version")
-    if version is None:
-        raise ParseError("Missing required field: version")
-
-    _check_version(str(version))
-
-    # v0.10 preprocessing: repeat expansion + params substitution
-    from rigy.preprocessing import preprocess
-
-    data = preprocess(data)
+    data = parse_preprocessed_yaml(source)
 
     try:
         return RigySpec(**data)
