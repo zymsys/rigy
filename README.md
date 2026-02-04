@@ -26,21 +26,38 @@ Requires Python 3.12+.
 rigy compile humanoid.rigy.yaml -o humanoid.glb
 rigy compile humanoid.rigy.yaml  # outputs humanoid.glb
 rigy compile scene.rigs.yaml -o scene.glb  # Rigs scene composition
+rigy compile humanoid.rigy.yaml --pose rest --bake-skin -o baked.glb
+rigy compile house.rigy.yaml --bake-transforms -o house.glb
 rigy compile house.rigy.yaml --emit-expanded-yaml expanded.yaml
 rigy compile house.rigy.yaml --emit-expanded-yaml - --emit-comments=provenance
+rigy compile house.rigy.yaml --emit-manifest manifest.json -o house.glb
+rigy compile house.rigy.yaml --warn-as-error W01,W02 --suppress-warning W03
 rigy inspect house.rigy.yaml
 rigy inspect house.rigy.yaml --format json --pairwise-gaps
 rigy inspect house.rigy.yaml --primitive wall_a --primitive wall_b --pairwise-gaps
+rigy inspect house.rigy.yaml --intent-checks --fail-on-intent
+rigy fmt house.rigy.yaml                # format to stdout
+rigy fmt house.rigy.yaml --in-place     # overwrite in place
+rigy fmt house.rigy.yaml --check        # exit code 1 if file would change (CI mode)
+rigy fmt house.rigy.yaml -o formatted.rigy.yaml
 ```
 
 The CLI auto-detects `.rigs.yaml` files and routes to the Rigs composition pipeline.
+
+`--pose <id> --bake-skin` evaluates a named pose and writes deformed geometry directly into the GLB, omitting skin data. `--bake-transforms` bakes instance transforms into geometry and bones.
 
 `--emit-expanded-yaml <path|->` emits the post-preprocessing Rigy YAML (after `repeat`, `params`, `aabb`, and `box_decompose`, before schema validation). Use `--emit-on-error` to still emit when later validation/export fails. `--emit-comments` controls comments in emitted YAML:
 - `keep` (default): keep author comments and add synthetic provenance comments
 - `drop`: emit without comments
 - `provenance`: emit only synthetic provenance comments
 
-`rigy inspect` runs the parse/validate/tessellate pipeline and reports deterministic geometry diagnostics without exporting GLB. It supports text or JSON output (`--format json`), primitive filtering (`--primitive`), optional pairwise AABB gaps (`--pairwise-gaps`), and optional expanded YAML emission (`--expanded`). `inspect` currently accepts `.rigy.yaml` inputs only.
+`--emit-manifest <path>` writes a JSON build manifest after a successful compile.
+
+`--warn-as-error <codes>` and `--suppress-warning <codes>` control warning policy. Both accept comma-separated W-codes (e.g., `W01,W02`). Available on both `compile` and `inspect`.
+
+`rigy inspect` runs the parse/validate/tessellate pipeline and reports deterministic geometry diagnostics without exporting GLB. It supports text or JSON output (`--format json`), primitive filtering (`--primitive`), optional pairwise AABB gaps (`--pairwise-gaps`), optional expanded YAML emission (`--expanded`), and intent check evaluation (`--intent-checks`, with `--fail-on-intent` to exit with code 3 on failure). `inspect` currently accepts `.rigy.yaml` inputs only.
+
+`rigy fmt` formats a `.rigy.yaml` file to canonical style. Output goes to stdout by default, or use `--in-place` to overwrite the input file, `-o` to write to a specific path, or `--check` for CI validation (exits with code 1 if the file would change).
 
 ### Library
 
@@ -390,6 +407,10 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **`box_decompose.mesh` removal** — The `mesh` field inside `box_decompose` is removed. Expansion target is implicitly the containing mesh. If present and mismatching, raises V76.
 
+**`box_decompose.offset_mode` convenience** — `box_decompose` supports `offset_mode` presets (`centerline`, `neg_face`, `pos_face`) that deterministically derive `offset` from `thickness`. `offset` and `offset_mode` are mutually exclusive.
+
+**`triangle_prism_on_plane` macro** — A v0.12 preprocessing macro that expands to a single `wedge` primitive from a plane (`origin`, `normal`), two in-plane leg vectors (`leg_p`, `leg_q`), and `length`. The macro computes dimensions, translation, and canonical `rotation_quat`.
+
 **AABB scope clarification** — `aabb` authoring is valid only for `type: box`. Error messages must reference `box.aabb`.
 
 **Version gating** — All v0.12 features require `version: "0.12"` or later. Using v0.12-only features under an earlier version raises V77.
@@ -424,7 +445,11 @@ Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in 
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, [`spec/rigy_spec_v0.10_amendment_rc1.md`](spec/rigy_spec_v0.10_amendment_rc1.md) for the v0.10 preprocessing amendment, [`spec/rigy_spec_v0.11-amendment-rc2.md`](spec/rigy_spec_v0.11-amendment-rc2.md) for the v0.11 AABB/macros/tags amendment, [`spec/proposals/rigy_v0.12_amendment_ergonomics_FINAL_revised.md`](spec/proposals/rigy_v0.12_amendment_ergonomics_FINAL_revised.md) for the v0.12 ergonomics amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
+The canonical Rigy spec is the cumulative v0.12 document set at [`spec/rigy/index.md`](spec/rigy/index.md), with chapter files under `spec/rigy/` (including preprocessing, validation, conformance, and versioning).
+
+For Rigs scene composition, see [`spec/rigs/index.md`](spec/rigs/index.md).
+
+Historical release snapshots and proposal drafts remain in `spec/` and `spec/proposals/` for reference.
 
 ## Development
 
