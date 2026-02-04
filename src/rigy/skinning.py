@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +10,7 @@ import numpy as np
 
 from rigy.errors import ExportError, ValidationError
 from rigy.models import Armature, Binding, Bone, Gradient
+from rigy.warning_policy import WarningPolicy, emit_warning
 
 
 @dataclass
@@ -31,6 +31,7 @@ def compute_skinning(
     *,
     positions: np.ndarray | None = None,
     yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
 ) -> SkinData:
     """Compute skinning arrays for a bound mesh.
 
@@ -133,9 +134,10 @@ def compute_skinning(
         bone_weights = influences.get(v, [(root_bone_idx, 1.0)])
 
         if len(bone_weights) > 4:
-            warnings.warn(
+            emit_warning(
+                "W01",
                 f"Vertex {v} has {len(bone_weights)} joint influences; capping to 4",
-                stacklevel=2,
+                policy=warning_policy,
             )
 
         # Sort: weight desc, bone_id string asc, bone_index asc

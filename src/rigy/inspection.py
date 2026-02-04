@@ -74,6 +74,7 @@ def inspect_spec(
     faces = _face_payloads(selected_entries, spec.version)
 
     result: dict[str, object] = {
+        "inspect_schema_version": 1,
         "summary": summary,
         "primitives": primitives,
         "faces": faces,
@@ -108,6 +109,10 @@ def has_failed_intent_checks(payload: dict[str, object]) -> bool:
 def render_text(payload: dict[str, object], expanded_yaml: str | None = None) -> str:
     """Render human-readable text output for inspect diagnostics."""
     lines: list[str] = []
+
+    isv = payload.get("inspect_schema_version")
+    if isv is not None:
+        lines.append(f"inspect_schema_version: {isv}")
 
     summary = payload["summary"]
     bounds = summary["bounds"]
@@ -235,9 +240,15 @@ def _face_payloads(entries: list[PrimitiveDiagnostics], version: str) -> list[di
 def _pairwise_payloads(entries: list[PrimitiveDiagnostics]) -> list[dict[str, object]]:
     pairs: list[dict[str, object]] = []
     for a_entry, b_entry in combinations(entries, 2):
-        gap_x = _axis_gap(a_entry.aabb_min[0], a_entry.aabb_max[0], b_entry.aabb_min[0], b_entry.aabb_max[0])
-        gap_y = _axis_gap(a_entry.aabb_min[1], a_entry.aabb_max[1], b_entry.aabb_min[1], b_entry.aabb_max[1])
-        gap_z = _axis_gap(a_entry.aabb_min[2], a_entry.aabb_max[2], b_entry.aabb_min[2], b_entry.aabb_max[2])
+        gap_x = _axis_gap(
+            a_entry.aabb_min[0], a_entry.aabb_max[0], b_entry.aabb_min[0], b_entry.aabb_max[0]
+        )
+        gap_y = _axis_gap(
+            a_entry.aabb_min[1], a_entry.aabb_max[1], b_entry.aabb_min[1], b_entry.aabb_max[1]
+        )
+        gap_z = _axis_gap(
+            a_entry.aabb_min[2], a_entry.aabb_max[2], b_entry.aabb_min[2], b_entry.aabb_max[2]
+        )
         pairs.append(
             {
                 "a": a_entry.primitive.id,

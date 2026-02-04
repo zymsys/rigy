@@ -377,6 +377,50 @@ meshes:
         assert result.exit_code == 2
         assert "supports only .rigy.yaml inputs" in result.output
 
+    def test_inspect_schema_version_in_json(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_sv.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["inspect", str(input_file), "--format", "json"],
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["inspect_schema_version"] == 1
+
+    def test_inspect_schema_version_in_text(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "inspect_sv_text.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+"""
+        )
+
+        result = runner.invoke(main, ["inspect", str(input_file)])
+        assert result.exit_code == 0, result.output
+        assert "inspect_schema_version: 1" in result.output
+
     def test_inspect_json_with_expanded_yaml(self, tmp_path):
         runner = CliRunner()
         input_file = tmp_path / "inspect_expanded.rigy.yaml"
@@ -407,3 +451,194 @@ meshes:
         assert "expanded_yaml" in payload
         assert "params:" not in payload["expanded_yaml"]
         assert "x: 1.25" in payload["expanded_yaml"]
+
+    def test_warn_as_error_exits_nonzero(self, tmp_path):
+        """A spec triggering W03 should fail with --warn-as-error W03."""
+        runner = CliRunner()
+        input_file = tmp_path / "w03.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.6"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+armatures:
+  - id: arm
+    bones:
+      - id: root
+        parent: none
+        head: [1, 0, 0]
+        tail: [1, 1, 0]
+        roll: 0
+bindings:
+  - mesh_id: m
+    armature_id: arm
+    weights:
+      - primitive_id: p
+        bones:
+          - bone_id: root
+            weight: 1.0
+"""
+        )
+        output_file = tmp_path / "w03.glb"
+        result = runner.invoke(
+            main,
+            ["compile", str(input_file), "-o", str(output_file), "--warn-as-error", "W03"],
+        )
+        assert result.exit_code != 0
+        assert "W03" in result.output
+
+    def test_suppress_warning_silences(self, tmp_path):
+        """A spec triggering W03 should succeed silently with --suppress-warning W03."""
+        runner = CliRunner()
+        input_file = tmp_path / "w03_suppress.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.6"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+armatures:
+  - id: arm
+    bones:
+      - id: root
+        parent: none
+        head: [1, 0, 0]
+        tail: [1, 1, 0]
+        roll: 0
+bindings:
+  - mesh_id: m
+    armature_id: arm
+    weights:
+      - primitive_id: p
+        bones:
+          - bone_id: root
+            weight: 1.0
+"""
+        )
+        output_file = tmp_path / "w03_suppress.glb"
+        result = runner.invoke(
+            main,
+            [
+                "compile",
+                str(input_file),
+                "-o",
+                str(output_file),
+                "--suppress-warning",
+                "W03",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_invalid_warning_code_rejected(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "valid.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+"""
+        )
+        result = runner.invoke(
+            main,
+            ["compile", str(input_file), "--warn-as-error", "W99"],
+        )
+        assert result.exit_code != 0
+        assert "Unknown warning code" in result.output
+
+    def test_emit_manifest_creates_valid_json(self, minimal_mesh_yaml, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "manifest_test.rigy.yaml"
+        input_file.write_text(minimal_mesh_yaml)
+        output_file = tmp_path / "manifest_test.glb"
+        manifest_file = tmp_path / "manifest.json"
+
+        result = runner.invoke(
+            main,
+            [
+                "compile",
+                str(input_file),
+                "-o",
+                str(output_file),
+                "--emit-manifest",
+                str(manifest_file),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert manifest_file.exists()
+
+        manifest = json.loads(manifest_file.read_text())
+        assert manifest["manifest_version"] == 1
+        assert manifest["tool"]["name"] == "rigy"
+        assert "sha256" in manifest["input"]
+        assert "sha256" in manifest["output"]
+        assert len(manifest["output"]["sha256"]) == 64
+
+    def test_manifest_not_written_on_failure(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "bad.rigy.yaml"
+        input_file.write_text("version: '1.0'\n")
+        manifest_file = tmp_path / "manifest.json"
+
+        result = runner.invoke(
+            main,
+            ["compile", str(input_file), "--emit-manifest", str(manifest_file)],
+        )
+        assert result.exit_code != 0
+        assert not manifest_file.exists()
+
+    def test_manifest_includes_expanded_yaml(self, tmp_path):
+        runner = CliRunner()
+        input_file = tmp_path / "manifest_exp.rigy.yaml"
+        input_file.write_text(
+            """\
+version: "0.11"
+units: meters
+params:
+  size: 1.0
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions:
+          x: $size
+          y: 1
+          z: 1
+"""
+        )
+        output_file = tmp_path / "manifest_exp.glb"
+        expanded_file = tmp_path / "expanded.yaml"
+        manifest_file = tmp_path / "manifest.json"
+
+        result = runner.invoke(
+            main,
+            [
+                "compile",
+                str(input_file),
+                "-o",
+                str(output_file),
+                "--emit-expanded-yaml",
+                str(expanded_file),
+                "--emit-manifest",
+                str(manifest_file),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        manifest = json.loads(manifest_file.read_text())
+        assert "expanded_yaml" in manifest
+        assert "sha256" in manifest["expanded_yaml"]

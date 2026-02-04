@@ -16,6 +16,7 @@ from rigy.models import Pose, RigySpec
 from rigy.skinning import SkinData, compute_skinning
 from rigy.tessellation import tessellate_mesh
 from rigy.uv import generate_uv_sets
+from rigy.warning_policy import WarningPolicy
 
 
 def export_gltf(
@@ -23,6 +24,7 @@ def export_gltf(
     output_path: Path,
     *,
     yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
 ) -> None:
     """Export a validated Rigy spec or composed asset to a GLB file.
 
@@ -30,9 +32,11 @@ def export_gltf(
     """
     try:
         if isinstance(spec_or_composed, ComposedAsset):
-            gltf = _build_gltf_composed(spec_or_composed, yaml_dir=yaml_dir)
+            gltf = _build_gltf_composed(
+                spec_or_composed, yaml_dir=yaml_dir, warning_policy=warning_policy
+            )
         else:
-            gltf = _build_gltf(spec_or_composed, yaml_dir=yaml_dir)
+            gltf = _build_gltf(spec_or_composed, yaml_dir=yaml_dir, warning_policy=warning_policy)
         _save_glb_deterministic(gltf, output_path)
     except Exception as e:
         if isinstance(e, ExportError):
@@ -46,6 +50,7 @@ def export_baked_gltf(
     output_path: Path,
     *,
     yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
 ) -> None:
     """Export a baked (pose-evaluated) GLB with skinning removed.
 
@@ -53,7 +58,7 @@ def export_baked_gltf(
     geometry without JOINTS_0/WEIGHTS_0/Skin/IBM data.
     """
     try:
-        gltf = _build_gltf_baked(spec, pose, yaml_dir=yaml_dir)
+        gltf = _build_gltf_baked(spec, pose, yaml_dir=yaml_dir, warning_policy=warning_policy)
         _save_glb_deterministic(gltf, output_path)
     except Exception as e:
         if isinstance(e, ExportError):
@@ -128,6 +133,7 @@ def _build_gltf_baked(
     pose: Pose,
     *,
     yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
 ) -> pygltflib.GLTF2:
     """Build baked glTF2 structure — deformed geometry, no skin."""
     gltf = pygltflib.GLTF2(
@@ -189,6 +195,7 @@ def _build_gltf_baked(
                 len(positions),
                 positions=positions,
                 yaml_dir=yaml_dir,
+                warning_policy=warning_policy,
             )
             positions, mesh_normals = evaluate_pose(
                 spec,
@@ -385,7 +392,10 @@ def _build_gltf_baked(
 
 
 def _build_gltf_composed(
-    composed: ComposedAsset, *, yaml_dir: Path | None = None
+    composed: ComposedAsset,
+    *,
+    yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
 ) -> pygltflib.GLTF2:
     """Build the complete glTF2 structure for a composed asset."""
     gltf = pygltflib.GLTF2(
@@ -408,7 +418,13 @@ def _build_gltf_composed(
     mesh_id_to_gltf_idx: dict[str, int] = {}
     pre_count = len(gltf.meshes)
     _build_spec_meshes(
-        gltf, composed.root_spec, blob_data, material_map, scene_nodes, yaml_dir=yaml_dir
+        gltf,
+        composed.root_spec,
+        blob_data,
+        material_map,
+        scene_nodes,
+        yaml_dir=yaml_dir,
+        warning_policy=warning_policy,
     )
     for i, mesh_def in enumerate(composed.root_spec.meshes):
         mesh_id_to_gltf_idx[mesh_def.id] = pre_count + i
@@ -491,7 +507,12 @@ def _build_local_mesh_instance(
     scene_nodes.append(node_idx)
 
 
-def _build_gltf(spec: RigySpec, *, yaml_dir: Path | None = None) -> pygltflib.GLTF2:
+def _build_gltf(
+    spec: RigySpec,
+    *,
+    yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
+) -> pygltflib.GLTF2:
     """Build the complete glTF2 structure (v0.1 path)."""
     gltf = pygltflib.GLTF2(
         scene=0,
@@ -509,7 +530,15 @@ def _build_gltf(spec: RigySpec, *, yaml_dir: Path | None = None) -> pygltflib.GL
     material_map: dict[str, int] = {}
     scene_nodes: list[int] = []
 
-    _build_spec_meshes(gltf, spec, blob_data, material_map, scene_nodes, yaml_dir=yaml_dir)
+    _build_spec_meshes(
+        gltf,
+        spec,
+        blob_data,
+        material_map,
+        scene_nodes,
+        yaml_dir=yaml_dir,
+        warning_policy=warning_policy,
+    )
 
     gltf.scenes[0].nodes = scene_nodes
 
@@ -529,6 +558,7 @@ def _build_spec_meshes(
     name_prefix: str = "",
     *,
     yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
 ) -> None:
     """Build mesh/bone/skin nodes for a spec and append to scene_nodes."""
     # Build binding lookup
@@ -692,6 +722,7 @@ def _build_spec_meshes(
                 len(mesh_data.positions),
                 positions=mesh_data.positions,
                 yaml_dir=yaml_dir,
+                warning_policy=warning_policy,
             )
 
             # Write joints

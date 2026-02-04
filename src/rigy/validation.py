@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import re
-import warnings
 
 from rigy.errors import ValidationError
 from rigy.models import (
@@ -14,9 +13,10 @@ from rigy.models import (
     ResolvedAsset,
     RigySpec,
 )
+from rigy.warning_policy import WarningPolicy, emit_warning
 
 
-def validate(spec: RigySpec) -> None:
+def validate(spec: RigySpec, *, warning_policy: WarningPolicy | None = None) -> None:
     """Run all semantic validation checks on a parsed spec.
 
     Raises:
@@ -36,7 +36,7 @@ def validate(spec: RigySpec) -> None:
     _check_no_zero_length_bones(spec)
     _check_primitive_dimensions_positive(spec)
     _check_binding_refs(spec)
-    _check_weight_map_refs(spec)
+    _check_weight_map_refs(spec, warning_policy=warning_policy)
     _check_mesh_single_binding(spec)
     _check_weights_in_range(spec)
     _check_unique_anchor_ids(spec)
@@ -58,7 +58,7 @@ def validate(spec: RigySpec) -> None:
     _check_uv_roles_requires_uv_sets(spec)
     _check_uv_role_set_declared(spec)
     _check_uv_set_contiguous(spec)
-    _warn_armature_root_not_at_origin(spec)
+    _warn_armature_root_not_at_origin(spec, warning_policy=warning_policy)
 
 
 def _check_wedge_version_gate(spec: RigySpec) -> None:
@@ -198,7 +198,7 @@ def _check_binding_refs(spec: RigySpec) -> None:
                     raise ValidationError(f"Binding references unknown bone: {bw.bone_id!r}")
 
 
-def _check_weight_map_refs(spec: RigySpec) -> None:
+def _check_weight_map_refs(spec: RigySpec, *, warning_policy: WarningPolicy | None = None) -> None:
     """Validate weight_maps references: primitive_id, bone_ids, weight ranges."""
     # Build primitive id sets per mesh
     prim_ids_by_mesh: dict[str, set[str]] = {}
@@ -227,10 +227,11 @@ def _check_weight_map_refs(spec: RigySpec) -> None:
                 )
 
             if wm.primitive_id in pw_prim_ids:
-                warnings.warn(
+                emit_warning(
+                    "W02",
                     f"Primitive {wm.primitive_id!r} has both per-primitive weights "
                     f"and a weight map; weight map layers will override",
-                    stacklevel=2,
+                    policy=warning_policy,
                 )
 
             if wm.gradients:
@@ -707,16 +708,19 @@ def _check_uv_set_contiguous(spec: RigySpec) -> None:
             )
 
 
-def _warn_armature_root_not_at_origin(spec: RigySpec) -> None:
+def _warn_armature_root_not_at_origin(
+    spec: RigySpec, *, warning_policy: WarningPolicy | None = None
+) -> None:
     """Emit a warning if any armature's root bone has head != (0,0,0)."""
     for arm in spec.armatures:
         for bone in arm.bones:
             if bone.parent == "none":
                 hx, hy, hz = bone.head
                 if abs(hx) > 1e-9 or abs(hy) > 1e-9 or abs(hz) > 1e-9:
-                    warnings.warn(
+                    emit_warning(
+                        "W03",
                         f"Armature {arm.id!r}: root bone {bone.id!r} head is "
                         f"({hx}, {hy}, {hz}), not at origin. Convention is to "
                         f"place the armature root at (0, 0, 0).",
-                        stacklevel=2,
+                        policy=warning_policy,
                     )
