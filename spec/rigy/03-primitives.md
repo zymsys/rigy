@@ -26,7 +26,7 @@ The `v0_1_default` tessellation profile, as defined in v0.1, remains the only su
 | capsule   | 8 hemisphere rings x 32 radial x 8 height | 9x33 + 9x33 + 8x33 = 858 | 4800 (1600 tris) |
 | wedge     | — | 18 | 24 (8 tris) |
 
-Implementations MUST produce identical vertex counts for identical input dimensions. Primitives are tessellated in YAML declaration order and merged into a single glTF primitive per mesh.
+Implementations MUST produce identical vertex counts for identical input dimensions. In v0.1–v0.11, primitives are tessellated in YAML declaration order and merged into a single glTF primitive per mesh. In v0.12+, each Rigy primitive emits one glTF primitive (see [Section 13.2](13-gltf-export.md#132-bufferview-and-accessor-ordering)).
 
 ### Canonical Vertex and Index Emission Order (Normative)
 
@@ -276,6 +276,8 @@ At any fixed Y, the cross-section is the right triangle `(A, B, C)` where the ri
 Use `rotation_degrees` for authoring these common orientations.
 `rotation_euler` (radians) remains available for compatibility.
 
+> **Note (Normative):** Wedge recipe descriptions refer to the wedge's **local frame after rotation but before translation**. They do not describe world-space directions. In v0.12+, authors may also use `rotation_axis_angle` or `rotation_quat` (see [Section 10.9](10-preprocessing.md#109-rotation-authoring-and-canonical-form-v012)) to avoid Euler composition entirely.
+
 | Use Case | rotation_degrees | Notes |
 |----------|------------------|-------|
 | Default (slope toward +Z) | `[0, 0, 0]` | Hypotenuse faces +Z |
@@ -284,17 +286,50 @@ Use `rotation_degrees` for authoring these common orientations.
 | Slope toward -X | `[0, 90, 0]` | 90° about Y |
 | Gable fill (triangular face toward +Z) | `[-90, 0, 0]` | -90° about X |
 | Gable fill (triangular face toward -Z) | `[90, 0, 0]` | 90° about X |
+| Gable left half (local right angle at +X; front -Z) | `[-90, 180, 0]` | Right angle at center, slope toward -X |
+| Gable right half (local right angle at -X; front -Z) | `[-90, 0, 0]` | Right angle at center, slope toward +X |
 
-**Gable example** (left half of front gable):
+**Gable example** (symmetric front gable from two wedges):
+
+A symmetric gable requires two wedges mirrored about the ridge axis. Each wedge's `x` dimension is half the wall width, `z` is the gable rise, and `y` is the wall thickness. The right angle sits at the ridge (center) and the hypotenuse slopes down to the eave.
 
 ```yaml
+# Left half — right angle at ridge, hypotenuse slopes down to left eave
 - type: wedge
   id: gable_left
   dimensions: { x: 4.0, y: 0.2, z: 1.5 }
   transform:
     rotation_degrees: [-90, 180, 0]  # -90° about X, 180° about Y
     translation: [-2.0, 3.45, 2.9]
+
+# Right half — right angle at ridge, hypotenuse slopes down to right eave
+- type: wedge
+  id: gable_right
+  dimensions: { x: 4.0, y: 0.2, z: 1.5 }
+  transform:
+    rotation_degrees: [-90, 0, 0]    # -90° about X only
+    translation: [2.0, 3.45, 2.9]
 ```
+
+**Worked example: "Right half" world-space vertices**
+
+Given `gable_right` above with `dimensions: { x: 4.0, y: 0.2, z: 1.5 }`, `rotation_degrees: [-90, 0, 0]`, `translation: [2.0, 3.45, 2.9]`:
+
+* `hx=2.0, hy=0.1, hz=0.75`
+* `Rx(-90°)` maps `(x,y,z) → (x, z, -y)`
+
+Pre-transform conceptual vertices and their world-space positions after rotation then translation:
+
+| Vertex | Pre-transform | After Rx(-90°) | + translation | World (x, y, z) |
+|--------|---------------|----------------|---------------|-----------------|
+| v0 (A0) | (-2.0, -0.1, -0.75) | (-2.0, -0.75, 0.1) | | (0.0, 2.7, 3.0) |
+| v1 (B0) | (+2.0, -0.1, -0.75) | (+2.0, -0.75, 0.1) | | (4.0, 2.7, 3.0) |
+| v2 (C0) | (-2.0, -0.1, +0.75) | (-2.0, +0.75, 0.1) | | (0.0, 4.2, 3.0) |
+| v3 (A1) | (-2.0, +0.1, -0.75) | (-2.0, -0.75, -0.1) | | (0.0, 2.7, 2.8) |
+| v4 (B1) | (+2.0, +0.1, -0.75) | (+2.0, -0.75, -0.1) | | (4.0, 2.7, 2.8) |
+| v5 (C1) | (-2.0, +0.1, +0.75) | (-2.0, +0.75, -0.1) | | (0.0, 4.2, 2.8) |
+
+The triangular cross-section (A, B, C) now lies in the XY plane: the right-angle corner (A vertices at world X=0) sits at the ridge center, B vertices extend to the right eave (X=4), and C vertices mark the apex (Y=4.2). The slab thickness spans Z=[2.8, 3.0], with the `-y` triangular face (Z=3.0) facing the +Z direction.
 
 ### Degree-to-Radian Reference
 
@@ -394,7 +429,7 @@ If the mesh declares UV sets (v0.8+ `uv_sets`), then `wedge` participates under 
 - Generators applicable to `all` primitives (e.g., `planar_xy@1`) apply to `wedge` without special casing.
 - Generators applicable only to specific primitives (e.g., `box_project@1`) are invalid in meshes that contain `wedge`.
 
-No wedge-specific UV generator is defined in v0.9, v0.10, or v0.11.
+No wedge-specific UV generator is defined in v0.9, v0.10, v0.11, or v0.12.
 
 ---
 

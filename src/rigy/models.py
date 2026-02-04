@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.11 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.12 specs."""
 
 from __future__ import annotations
 
@@ -57,17 +57,36 @@ class CoordinateSystem(BaseModel):
     handedness: Literal["right"]
 
 
+class RotationAxisAngle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    axis: tuple[float, float, float]
+    degrees: float
+
+
 class Transform(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     translation: tuple[float, float, float] | None = None
     rotation_euler: tuple[float, float, float] | None = None
     rotation_degrees: tuple[float, float, float] | None = None
+    rotation_axis_angle: RotationAxisAngle | None = None
+    rotation_quat: tuple[float, float, float, float] | None = None  # (x, y, z, w)
 
     @model_validator(mode="after")
     def _normalize_rotation_fields(self) -> Transform:
-        if self.rotation_euler is not None and self.rotation_degrees is not None:
-            raise ValueError("Transform must set either 'rotation_euler' or 'rotation_degrees', not both")
+        # Count how many rotation forms are set
+        forms = [
+            self.rotation_euler is not None,
+            self.rotation_degrees is not None,
+            self.rotation_axis_angle is not None,
+            self.rotation_quat is not None,
+        ]
+        if sum(forms) > 1:
+            raise ValueError(
+                "V72: Transform must set at most one rotation form "
+                "(rotation_euler, rotation_degrees, rotation_axis_angle, rotation_quat)"
+            )
 
         if self.rotation_degrees is not None and self.rotation_euler is None:
             self.rotation_euler = tuple(math.radians(v) for v in self.rotation_degrees)
@@ -108,6 +127,7 @@ class Mesh(BaseModel):
     id: str
     name: str | None = None
     primitives: list[Primitive]
+    material: str | None = None  # v0.12+: default material for primitives
     uv_sets: dict[str, UvSetEntry] | None = None
     uv_roles: dict[str, UvRoleEntry] | None = None
 

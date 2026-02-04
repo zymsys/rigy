@@ -51,7 +51,26 @@ Preprocessing in v0.10+:
 
 * `params` substitution and `repeat` expansion MUST be deterministic.
 * The expanded document MUST be identical regardless of implementation, given the same input.
-* Preprocessing MUST NOT introduce floating-point computation; it operates on the YAML object model only.
+* In v0.10–v0.11, preprocessing operates on the YAML object model only (no floating-point computation).
+* In v0.12+, preprocessing adds expression evaluation and rotation normalization, both of which introduce IEEE-754 binary64 computation under strict quantization (see below).
+
+#### Expression Determinism (v0.12+)
+
+Expression scalars (Section 10.8) are evaluated during preprocessing using IEEE-754 binary64 arithmetic. To preserve byte-identical output:
+
+* All intermediate and final results MUST use binary64.
+* Final values MUST be quantized to step `q = 1e-9`: `x := round(x / q) * q`.
+* `-0.0` MUST be canonicalized to `0.0`.
+* Non-finite results (`NaN`, `±Inf`) MUST be rejected (V70).
+
+#### Rotation Normalization Determinism (v0.12+)
+
+All rotation authoring forms (Section 10.9) are canonicalized to `rotation_quat` during preprocessing. To preserve byte-identical output:
+
+* All intermediate quaternion calculations MUST use binary64.
+* Final quaternion components MUST be quantized to step `q = 1e-12`: `c := round(c / q) * q`.
+* `-0.0` MUST be canonicalized to `0.0`.
+* The sign convention `w >= 0` MUST be enforced (negate all components if `w < 0`).
 
 ### Scope of Determinism
 
@@ -73,7 +92,7 @@ coordinate_system:
 
 Rigy uses a right-handed coordinate system with **Y-up**, consistent with glTF 2.0.
 
-Any v0.11 macro that needs a vertical base MUST use `base_y`.
+Any v0.11+ macro that needs a vertical base MUST use `base_y`.
 
 ---
 

@@ -1,4 +1,4 @@
-You are working in a local repo that contains the Rigy v0.11 spec as a set of Markdown chapters under:
+You are working in a local repo that contains the Rigy spec as a set of Markdown chapters under:
 
   spec/rigy/
 
@@ -6,7 +6,7 @@ There may also be old / misleading "examples/" files in the repo. DO NOT copy or
 
 Goal
 ----
-Create a NEW Rigy v0.11 YAML file that models a simple "kids drawing" house:
+Create a NEW Rigy YAML file (using the latest version declared in spec/rigy/index.md) that models a simple "kids drawing" house:
 - Visual style: simple / stylized
 - Scope: exterior only
 - Primitive policy: boxes, wedges, `box_decompose`; avoid unnecessary complexity
@@ -26,7 +26,7 @@ Coordinate contract
 
 Critical constraints (do not violate)
 ------------------------------------
-1) Rigy v0.11 has NO top-level `surfaces:` registry. Do not invent it.
+1) Rigy has NO top-level `surfaces:` registry. Do not invent it.
    - `surface:` on primitives/macros (if used) is just a label. No registry required.
 
 2) Mesh material homogeneity is STRICT (V41):
@@ -72,7 +72,7 @@ E) Run `rigy inspect` to verify geometry BEFORE rendering:
    - Door/window AABBs fall within the front wall's span.
 
 F) Render two views with f3d:
-   - Isometric: `f3d --verbose --resolution=1024,1024 --output=scratch/kids_house_iso.png scratch/kids_house.glb`
+   - Isometric (front-left): `f3d --verbose --resolution=1024,1024 --camera-direction=1,-0.5,1 --output=scratch/kids_house_iso.png scratch/kids_house.glb`
    - Front:     `f3d --verbose --resolution=1024,1024 --camera-direction=0,0,1 --output=scratch/kids_house_front.png scratch/kids_house.glb`
 
 G) Visually inspect both PNGs.

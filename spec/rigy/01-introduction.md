@@ -2,11 +2,11 @@
 
 ## 1.1 Goals
 
-Rigy v0.11 is a **cumulative specification** encompassing all features introduced from v0.1 through v0.11.
+Rigy v0.12 is a **cumulative specification** encompassing all features introduced from v0.1 through v0.12.
 
 ### Relationship to Prior Versions
 
-Rigy v0.11 is a **strict superset** of all prior versions. All features are retained:
+Rigy v0.12 is a **strict superset** of all prior versions. All features are retained:
 
 * **v0.1** — Geometric primitives, armatures, per-primitive skinning, symmetry
 * **v0.2** — Anchors, imports, instances, attach3, contracts (Ricy)
@@ -19,10 +19,11 @@ Rigy v0.11 is a **strict superset** of all prior versions. All features are reta
 * **v0.9** — Wedge primitive, primitive surface keys, version gating for new primitives
 * **v0.10** — Preprocessing stage: compile-time `params`, `repeat` macro, strict schema enforcement, duplicate YAML key detection
 * **v0.11** — AABB box syntax, `box_decompose` macro, semantic tags
+* **v0.12** — Numeric expressions, axis–angle rotations, per-primitive materials, `box_decompose.mesh` removal, AABB scope clarification
 
 ### Roadmap Note
 
-Future work may include corrective shapes, pose-space deformation, constraints, control rigs, and additional macros. These are not part of v0.11.
+Future work may include corrective shapes, pose-space deformation, constraints, control rigs, and additional macros. These are not part of v0.12.
 
 ---
 
@@ -34,7 +35,7 @@ Rigy is a **compile target for geometry**, not a domain modeling language. Featu
 
 ### Specific Exclusions
 
-Rigy v0.11 explicitly does **not**:
+Rigy v0.12 explicitly does **not**:
 
 * Add blendshapes, corrective shapes, or pose-space deformation
 * Introduce IK systems, constraints, or control rigs
@@ -45,7 +46,7 @@ Rigy v0.11 explicitly does **not**:
 * Add manual UV authoring, seam placement controls, island rotation or packing
 * Add per-primitive UV sets
 * Guarantee backward compatibility with incorrect outputs
-* Introduce expressions, arithmetic, or conditionals
+* Introduce conditionals or control flow (bounded compile-time expressions are added in v0.12)
 * Add geometry booleans / CSG
 * Add implicit modeling operations (e.g., "cut hole")
 * Introduce runtime variability
@@ -56,11 +57,27 @@ Rigy v0.11 explicitly does **not**:
 
 ### Parser Compatibility
 
-A v0.11 conforming parser:
+A v0.12 conforming parser:
 
-* MUST accept `version` values `"0.1"` through `"0.11"`
+* MUST accept `version` values `"0.1"` through `"0.12"`
 * MUST reject `version` with major version >= 1
-* SHOULD emit a warning for minor versions > 11 within major version 0
+* SHOULD emit a warning for minor versions > 12 within major version 0
+
+### From v0.11
+
+All valid v0.11 documents remain valid v0.12 files.
+
+v0.12 adds:
+
+* Numeric expression scalars (`"=<expr>"`) for any numeric field, evaluated during preprocessing
+* `rotation_axis_angle` and `rotation_quat` authoring forms
+* All rotation forms canonicalized to `rotation_quat` in preprocessed output
+* Mesh-level default `material` field, per-primitive material resolution
+* Per-primitive glTF emission (each Rigy primitive → one glTF primitive)
+* `box_decompose.mesh` field removed (implicit targeting)
+* AABB scope clarified to box-only
+* Version gating for all new features (V77)
+* Validation rules V67–V78
 
 ### From v0.10
 

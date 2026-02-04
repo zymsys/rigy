@@ -1,7 +1,7 @@
-# Rigy Specification v0.11
+# Rigy Specification v0.12
 
 **Status:** Specification
-**Scope:** Cumulative specification covering all features from v0.1 through v0.11
+**Scope:** Cumulative specification covering all features from v0.1 through v0.12
 
 The key words MUST, MUST NOT, SHOULD, SHALL, and MAY in this document are to be
 interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
@@ -21,9 +21,9 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 9. [UV System](09-uv-system.md) — UV roles, sets, generators
 10. [Preprocessing](10-preprocessing.md) — params, repeat, AABB, box_decompose, tags
 11. [Symmetry](11-symmetry.md) — Mirror-X expansion
-12. [Validation](12-validation.md) — Error model, V01-V66 table
+12. [Validation](12-validation.md) — Error model, V01-V78 table
 13. [glTF Export](13-gltf-export.md) — Serialization, buffer layout
-14. [Conformance](14-conformance.md) — Test suite, categories A-R
+14. [Conformance](14-conformance.md) — Test suite, categories A-S
 15. [Versioning](15-versioning.md) — Version format, trust model
 
 ### Appendices
@@ -50,6 +50,7 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 | Wedge primitive, surface keys | v0.9 |
 | Preprocessing (params, repeat) | v0.10 |
 | AABB box syntax, box_decompose, semantic tags | v0.11 |
+| Expressions, axis-angle rotations, per-primitive materials | v0.12 |
 
 ---
 
@@ -65,4 +66,4 @@ For a given Rigy input and specification version, a conforming implementation MU
 
 ---
 
-**End of Rigy Specification v0.11 Index**
+**End of Rigy Specification v0.12 Index**

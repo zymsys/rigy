@@ -8,11 +8,11 @@ Rigy versions use `MAJOR.MINOR` format (e.g., `"0.11"`). While `MAJOR` is 0, the
 
 ## 15.2 Parser Compatibility
 
-A v0.11 conforming parser:
+A v0.12 conforming parser:
 
-* MUST accept `version` values `"0.1"`, `"0.2"`, `"0.3"`, `"0.4"`, `"0.5"`, `"0.6"`, `"0.7"`, `"0.8"`, `"0.9"`, `"0.10"`, and `"0.11"`
+* MUST accept `version` values `"0.1"`, `"0.2"`, `"0.3"`, `"0.4"`, `"0.5"`, `"0.6"`, `"0.7"`, `"0.8"`, `"0.9"`, `"0.10"`, `"0.11"`, and `"0.12"`
 * MUST reject `version` with major version >= 1
-* SHOULD emit a warning for minor versions > 11 within major version 0
+* SHOULD emit a warning for minor versions > 12 within major version 0
 
 ---
 
@@ -93,7 +93,7 @@ The following are **permanently out of scope**:
 * Domain-specific primitives or macros (architectural, furniture, character)
 * Implicit modeling (CSG, fillets, chamfers)
 * Procedural generation (trees, terrain, scatter)
-* Runtime variability (expressions, conditionals, randomness)
+* Runtime variability (conditionals, randomness)
 * Animation systems (keyframes, graphs, IK)
 
 See [Section 2.3](02-fundamentals.md#23-scope-boundary) for design rationale.
@@ -102,7 +102,7 @@ See [Section 2.3](02-fundamentals.md#23-scope-boundary) for design rationale.
 
 ## 15.7 Summary
 
-Rigy v0.11 encompasses all features from v0.1 through v0.11:
+Rigy v0.12 encompasses all features from v0.1 through v0.12:
 
 * **Geometric primitives and armatures** with deterministic tessellation (v0.1)
 * **Composition**: anchors, imports, instances, attach3, contracts (v0.2)
@@ -115,16 +115,17 @@ Rigy v0.11 encompasses all features from v0.1 through v0.11:
 * **Wedge primitive and surface keys**: right triangular prism, flat-shaded, canonical surface provenance for box and wedge (v0.9)
 * **Preprocessing**: compile-time `params`, `repeat` macro, strict schema enforcement, duplicate YAML key detection (v0.10)
 * **Authoring helpers**: AABB box syntax, `box_decompose` macro, semantic tags (v0.11)
+* **Ergonomics**: numeric expressions, axis–angle rotations, per-primitive materials, `box_decompose.mesh` removal, AABB scope clarification (v0.12)
 
 The specification maintains:
 
-* Determinism as executable truth, verified by a normative conformance suite (categories A-R)
-* An exhaustive validation table (V01-V66, F114-F116)
+* Determinism as executable truth, verified by a normative conformance suite (categories A-S)
+* An exhaustive validation table (V01-V78, F114-F116)
 * Precise canonicalization rules for all serialization
 * A principled escape hatch for correcting mistakes (suite revisions)
 * A firm refusal to fossilize bugs
 
-> **Preprocessing in v0.11 is pure expansion — no expressions, no runtime, no surprises.**
+> **Bounded computation under strict quantization — same YAML, same GLB, byte-for-byte.**
 
 ---
 

@@ -147,7 +147,7 @@ symmetry:
     prefix_to: "legR_"
 ```
 
-The compiler expands `symmetry` before validation, producing mirrored `legR_*` primitives, bones, and weights automatically. The `materials` table defines named solid-color materials referenced by primitives — all primitives in a mesh must share the same material.
+The compiler expands `symmetry` before validation, producing mirrored `legR_*` primitives, bones, and weights automatically. The `materials` table defines named solid-color materials referenced by primitives — in v0.1–v0.11, all primitives in a mesh must share the same material; in v0.12+, per-primitive materials are allowed.
 
 ### Composed car with imported wheels (v0.2)
 
@@ -301,7 +301,7 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **Materials table** — Named materials defined at the top level with `base_color: [r, g, b, a]` in linear RGBA. Each component must be a finite float in `[0.0, 1.0]`.
 
-**Primitive assignment** — Primitives reference materials by ID. All primitives within a mesh must share the same material (or all omit it). Omitting `material` uses the implicit default (`[1.0, 1.0, 1.0, 1.0]`).
+**Primitive assignment** — Primitives reference materials by ID. In v0.1–v0.11, all primitives within a mesh must share the same material (or all omit it); this constraint is superseded in v0.12 (see v0.12 below). Omitting `material` uses the implicit default (`[1.0, 1.0, 1.0, 1.0]`).
 
 **glTF export** — Materials export as `pbrMetallicRoughness.baseColorFactor` with `metallicFactor=0.0`, `roughnessFactor=1.0`. Alpha 1.0 maps to `alphaMode: OPAQUE`, otherwise `BLEND`. `baseColorFactor` values are serialized with exactly 6 decimal places for cross-platform determinism.
 
@@ -372,13 +372,29 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **Semantic `tags`** — Primitives can declare `tags: [str, ...]`, an ordered list of non-geometric string labels. Tags from all primitives in a mesh are collected (deduplicated, order-preserving) and exported as `rigy_tags` in the glTF primitive's `extras` object. Version-gated to >= 0.11.
 
-**Expanded YAML emission (tooling)** — `rigy compile` can emit the expanded pre-validation YAML via `--emit-expanded-yaml`. Emission is observational only (does not alter validation or GLB bytes), canonicalizes emitted rotations to `rotation_degrees`, and supports comment modes (`keep`, `drop`, `provenance`) plus `--emit-on-error`.
+**Expanded YAML emission (tooling)** — `rigy compile` can emit the expanded pre-validation YAML via `--emit-expanded-yaml`. Emission is observational only (does not alter validation or GLB bytes). In v0.12+, all rotations are canonicalized to `rotation_quat` in the expanded output (prior versions canonicalize to `rotation_degrees`). Supports comment modes (`keep`, `drop`, `provenance`) plus `--emit-on-error`.
 
 **Geometry inspection (tooling)** — `rigy inspect` reports model bounds, per-primitive AABBs/centers/extents, face normals/planes for surface-key primitives, and optional pairwise AABB gap/overlap metrics. Inspection is observational only and does not affect validation outcomes or GLB bytes.
 
 **Tooling-only top-level block (`geometry_checks`)** — Rigy accepts an optional top-level `geometry_checks` key for external tooling workflows. The compiler treats it as non-semantic: ignored by validation, determinism, and export behavior.
 
 **Conformance fixtures** — Three positive test cases (H110–H112) covering AABB, box_decompose with single cutout, and box_decompose with multiple cutouts. Three negative test cases (F114–F116) covering macro ID collision, AABB with transform, and invalid cutout ID.
+
+### v0.12 — Ergonomics: expressions, rotations, per-primitive materials
+
+**Numeric expressions** — Any numeric scalar field may be specified as an expression string prefixed with `=` (e.g., `"=sqrt($run*$run + $rise*$rise)"`). Expressions support arithmetic operators, grouping, and built-in functions (`sqrt`, `sin`, `cos`, `min`, `max`, `clamp`, `abs`, `atan2`, `deg2rad`, `rad2deg`). Evaluated during preprocessing using IEEE-754 binary64, quantized to `1e-9` for determinism.
+
+**Axis–angle rotations** — `rotation_axis_angle` provides intuitive rotation authoring via an axis vector and degree angle. `rotation_quat` allows direct quaternion specification. All rotation forms (including existing `rotation_degrees` and `rotation_euler`) are canonicalized to `rotation_quat` in the preprocessed output, quantized to `1e-12`.
+
+**Per-primitive materials** — The one-material-per-mesh constraint (V41) is superseded. Each Rigy primitive emits one glTF primitive, enabling different materials within a mesh. Meshes may declare a default `material` field; resolution order is `primitive.material ?? mesh.material`. Each glTF primitive carries `extras.rigy_id` for source tracing.
+
+**`box_decompose.mesh` removal** — The `mesh` field inside `box_decompose` is removed. Expansion target is implicitly the containing mesh. If present and mismatching, raises V76.
+
+**AABB scope clarification** — `aabb` authoring is valid only for `type: box`. Error messages must reference `box.aabb`.
+
+**Version gating** — All v0.12 features require `version: "0.12"` or later. Using v0.12-only features under an earlier version raises V77.
+
+**Validation (V67–V78)** — Twelve new validation codes covering expression errors (V68–V71), rotation errors (V67, V72, V73, V78), material resolution (V74, V75), box_decompose mesh mismatch (V76), and version gating (V77).
 
 ### Rigs v0.1 — Scene composition
 
@@ -408,7 +424,7 @@ Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in 
 
 ## Spec
 
-See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, [`spec/rigy_spec_v0.10_amendment_rc1.md`](spec/rigy_spec_v0.10_amendment_rc1.md) for the v0.10 preprocessing amendment, [`spec/rigy_spec_v0.11-amendment-rc2.md`](spec/rigy_spec_v0.11-amendment-rc2.md) for the v0.11 AABB/macros/tags amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
+See [`spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md`](spec/rigy_spec_v0.1-rc2_with_rigs_roadmap.md) for the full specification, [`spec/rigy_spec_v0.2-rc2.md`](spec/rigy_spec_v0.2-rc2.md) for the v0.2 composition spec, [`spec/rigy_spec_v0.3-rc2.md`](spec/rigy_spec_v0.3-rc2.md) for the v0.3 weight maps spec, [`spec/rigy_spec_v0.4-rc3.md`](spec/rigy_spec_v0.4-rc3.md) for the v0.4 conformance and determinism spec, [`spec/rigy_spec_v0.5-amendment-rc2.md`](spec/rigy_spec_v0.5-amendment-rc2.md) for the v0.5 DQS amendment, [`spec/rigy_spec_v0.6-amendment-rc2.md`](spec/rigy_spec_v0.6-amendment-rc2.md) for the v0.6 materials amendment, [`spec/rigy_spec_v0.7-amendment-rc4.md`](spec/rigy_spec_v0.7-amendment-rc4.md) for the v0.7 UV roles amendment, [`spec/rigy_spec_v0.8-amendment-rc2.md`](spec/rigy_spec_v0.8-amendment-rc2.md) for the v0.8 UV generation amendment, [`spec/rigy_spec_v0.9-amendment-rc4.md`](spec/rigy_spec_v0.9-amendment-rc4.md) for the v0.9 wedge primitive amendment, [`spec/rigy_spec_v0.10_amendment_rc1.md`](spec/rigy_spec_v0.10_amendment_rc1.md) for the v0.10 preprocessing amendment, [`spec/rigy_spec_v0.11-amendment-rc2.md`](spec/rigy_spec_v0.11-amendment-rc2.md) for the v0.11 AABB/macros/tags amendment, [`spec/proposals/rigy_v0.12_amendment_ergonomics_FINAL_revised.md`](spec/proposals/rigy_v0.12_amendment_ergonomics_FINAL_revised.md) for the v0.12 ergonomics amendment, and [`spec/rigs_spec_v0.1-rc1.md`](spec/rigs_spec_v0.1-rc1.md) for the Rigs v0.1 scene composition spec.
 
 ## Development
 

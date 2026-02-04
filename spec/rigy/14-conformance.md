@@ -8,7 +8,7 @@ The Rigy specification includes a **normative conformance suite**, consisting of
 * Canonical output artifacts (`.glb`)
 * A manifest describing expected results
 
-An implementation is **Rigy v0.11 conformant** if and only if it produces byte-identical outputs for all positive conformance tests and rejects all negative conformance tests with the correct error category.
+An implementation is **Rigy v0.12 conformant** if and only if it produces byte-identical outputs for all positive conformance tests and rejects all negative conformance tests with the correct error category.
 
 ---
 
@@ -31,7 +31,7 @@ An implementation is **Rigy v0.11 conformant** if and only if it produces byte-i
 
 ```json
 {
-  "version": "0.11",
+  "version": "0.12",
   "suite_revision": 1,
   "tests": [
     {
@@ -101,7 +101,7 @@ An implementation is **Rigy v0.11 conformant** if and only if it produces byte-i
 
 ### F. Validation Failure Cases
 
-* Each hard error (V01-V66, F114-F116) SHOULD have at least one negative test
+* Each hard error (V01-V78, F114-F116) SHOULD have at least one negative test
 * Verifies the correct error type is raised and no output is produced
 
 ### G. Symmetry Expansion
@@ -185,6 +185,16 @@ An implementation is **Rigy v0.11 conformant** if and only if it produces byte-i
 * Semantic tags (v0.11)
 * Negative: duplicate YAML keys (V56), unknown fields (V57), non-scalar param (V58), unknown param (V59), illegal param usage (V60), param type mismatch (V61), invalid repeat forms (V62-V64), unresolved index token (V65), ID collision post-expansion (V66), macro ID collision (F114), AABB with transform (F115), invalid cutout ID (F116)
 
+### S. v0.12 Features
+
+* Expression evaluation and quantization
+* Axis–angle rotation canonicalization and `rotation_quat` normalization
+* Per-primitive materials with mixed-material meshes
+* `box_decompose` implicit mesh targeting
+* Version gating (V77)
+* Per-primitive glTF emission with `rigy_id` extras
+* Negative: expression errors (V68–V71), rotation errors (V67, V72, V73, V78), material resolution errors (V74, V75), box_decompose mesh mismatch (V76), version gating (V77)
+
 All categories MUST include both **positive** and **negative** cases where applicable.
 
 ---
@@ -217,6 +227,35 @@ All conformance comparisons MUST be byte-exact.
 * **F114_macro_id_collision** — Generated ID collides with user ID
 * **F115_aabb_with_transform** — AABB combined with transform (rejected)
 * **F116_invalid_cutout_id** — Invalid cutout identifier
+
+---
+
+## 14.7 v0.12 Conformance Additions
+
+### Positive Fixtures
+
+* **S01_expression_basic** — Expression scalars with arithmetic and `sqrt()`
+* **S02_expression_params** — Expressions referencing `$param` values
+* **S03_axis_angle_rotation** — `rotation_axis_angle` canonicalized to `rotation_quat`
+* **S04_rotation_quat_normalize** — `rotation_quat` normalization and sign convention
+* **S05_per_primitive_material** — Mixed-material mesh with per-primitive glTF emission
+* **S06_mesh_default_material** — Mesh-level `material` default with primitive override
+* **S07_box_decompose_implicit** — `box_decompose` without explicit `mesh` field
+
+### Negative Fixtures
+
+* **V67_zero_axis** — Zero-length rotation axis
+* **V68_expr_parse_error** — Invalid expression syntax
+* **V69_expr_unknown_param** — Expression references undefined parameter
+* **V70_expr_non_finite** — Expression produces NaN or Infinity
+* **V71_expr_domain_error** — `sqrt()` of negative number
+* **V72_multiple_rotations** — Multiple rotation forms on same transform
+* **V73_non_finite_rotation** — Non-finite rotation component
+* **V74_unresolved_material** — No material resolves when materials table exists
+* **V75_unknown_material** — Primitive references undefined material
+* **V76_mesh_mismatch** — `box_decompose.mesh` mismatches containing mesh
+* **V77_version_gating** — v0.12 feature used in v0.11 document
+* **V78_zero_quaternion** — Zero-length quaternion
 
 ---
 

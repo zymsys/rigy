@@ -16,18 +16,35 @@ from rigy.models import (
 from rigy.warning_policy import WarningPolicy, emit_warning
 
 
+def _spec_version(spec: RigySpec) -> tuple[int, int]:
+    """Parse spec version string to (major, minor) tuple."""
+    parts = spec.version.split(".")
+    if len(parts) == 2:
+        try:
+            return (int(parts[0]), int(parts[1]))
+        except ValueError:
+            pass
+    return (0, 1)
+
+
 def validate(spec: RigySpec, *, warning_policy: WarningPolicy | None = None) -> None:
     """Run all semantic validation checks on a parsed spec.
 
     Raises:
         ValidationError: On any semantic rule violation.
     """
+    version = _spec_version(spec)
+
     _check_wedge_version_gate(spec)
     _check_tags_version_gate(spec)
+    _check_v012_version_gates(spec, version)
     _check_material_base_color_length(spec)
     _check_material_base_color_range(spec)
-    _check_material_refs(spec)
-    _check_mesh_material_consistency(spec)
+    _check_material_refs(spec, version)
+    if version >= (0, 12):
+        _check_material_resolution_v012(spec)
+    else:
+        _check_mesh_material_consistency(spec)
     _check_unique_mesh_ids(spec)
     _check_unique_primitive_ids(spec)
     _check_unique_armature_ids(spec)
@@ -430,13 +447,18 @@ def _check_material_base_color_range(spec: RigySpec) -> None:
                 )
 
 
-def _check_material_refs(spec: RigySpec) -> None:
-    """V38: Primitive material references must exist in the materials table."""
+def _check_material_refs(spec: RigySpec, version: tuple[int, int]) -> None:
+    """V38/V75: Material references must exist in the materials table."""
     for mesh in spec.meshes:
+        # V75: mesh.material must exist if specified
+        if mesh.material is not None and mesh.material not in spec.materials:
+            raise ValidationError(
+                f"V75: Mesh {mesh.id!r} references unknown material: {mesh.material!r}"
+            )
         for prim in mesh.primitives:
             if prim.material is not None and prim.material not in spec.materials:
                 raise ValidationError(
-                    f"Primitive {prim.id!r} references unknown material: {prim.material!r}"
+                    f"V75: Primitive {prim.id!r} references unknown material: {prim.material!r}"
                 )
 
 
@@ -452,6 +474,37 @@ def _check_mesh_material_consistency(spec: RigySpec) -> None:
                     f"Mesh {mesh.id!r}: inconsistent material references — "
                     f"primitive {mesh.primitives[0].id!r} has material {first_mat!r}, "
                     f"but primitive {prim.id!r} has material {prim.material!r}"
+                )
+
+
+def _check_v012_version_gates(spec: RigySpec, version: tuple[int, int]) -> None:
+    """V77: Reject v0.12-only features in specs with version < 0.12.
+
+    Checks features that survive past preprocessing into the Pydantic model.
+    Expression scalars and rotation_axis_angle are already checked during preprocessing.
+    """
+    if version >= (0, 12):
+        return
+
+    for mesh in spec.meshes:
+        if mesh.material is not None:
+            raise ValidationError(
+                f"V77: mesh.material requires version >= 0.12, "
+                f"but spec declares version {spec.version!r}"
+            )
+
+
+def _check_material_resolution_v012(spec: RigySpec) -> None:
+    """V74: For v0.12+, every primitive must resolve a material.
+
+    Resolution: primitive.material ?? mesh.material.
+    """
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            resolved = prim.material or mesh.material
+            if resolved is None:
+                raise ValidationError(
+                    f"V74: no material resolved for primitive {prim.id!r} in mesh {mesh.id!r}"
                 )
 
 
@@ -476,6 +529,10 @@ def _check_no_nan_infinity(spec: RigySpec) -> None:
                     _check_floats(prim.transform.translation, f"primitive {prim.id!r} translation")
                 if prim.transform.rotation_euler:
                     _check_floats(prim.transform.rotation_euler, f"primitive {prim.id!r} rotation")
+                if prim.transform.rotation_quat:
+                    _check_floats(
+                        prim.transform.rotation_quat, f"primitive {prim.id!r} rotation_quat"
+                    )
 
     for arm in spec.armatures:
         for bone in arm.bones:

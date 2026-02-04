@@ -18,7 +18,32 @@ UV coordinates MUST be serialized as **IEEE 754 little-endian float32** (`binary
 
 ## 13.2 BufferView and Accessor Ordering
 
-For each mesh (in YAML declaration order), buffer data MUST be emitted in this order:
+### Per-Primitive Emission (v0.12+)
+
+In v0.12+, each Rigy mesh emits **one glTF mesh**, and each Rigy primitive within that mesh emits **one glTF primitive**.
+
+- **Ordering is preserved**: glTF `primitives[i]` corresponds to Rigy `primitives[i]`.
+- Each glTF primitive MUST have its own attribute accessors (POSITION, NORMAL, TEXCOORD_n) and its own indices accessor.
+- If skinning is enabled, each glTF primitive MUST have its own JOINTS_0 and WEIGHTS_0 accessors.
+- Inverse bind matrices are **shared per mesh** (one IBM accessor per mesh binding).
+- Implementations MAY pack multiple primitives' data into shared buffer(s) for efficiency, but MUST expose **separate accessors per glTF primitive**.
+
+For each primitive (in YAML declaration order within the mesh), buffer data MUST be emitted in this order:
+
+1. Position data (float32 x 3 x N vertices)
+2. Normal data (float32 x 3 x N vertices)
+3. UV data for each declared UV set, in index order (float32 x 2 x N vertices per set)
+4. Index data (uint32 x M indices)
+5. If the mesh is skinned:
+   a. Joint indices (uint16 x 4 x N vertices)
+   b. Weights (float32 x 4 x N vertices)
+
+After all primitives in a skinned mesh, emit:
+- Inverse bind matrices (float32 x 4 x 4 x J joints, column-major) — one accessor shared by all primitives in the mesh.
+
+### Legacy Merged Emission (v0.1–v0.11)
+
+In v0.1–v0.11, all primitives in a mesh are merged into a single glTF primitive. For each mesh (in YAML declaration order), buffer data MUST be emitted in this order:
 
 1. Position data (float32 x 3 x N vertices)
 2. Normal data (float32 x 3 x N vertices)
@@ -85,6 +110,10 @@ Example:
 
 This rule ensures cross-platform string identity.
 
+### Per-Primitive Material (v0.12+)
+
+In v0.12+, each glTF primitive within a mesh MAY have a different material index, corresponding to its resolved material (see [Section 8.6](08-materials.md#86-material-resolution-v012)).
+
 ---
 
 ## 13.6 UV Export
@@ -111,6 +140,28 @@ When exporting to glTF 2.0:
 
 * Tags are exported as-is, preserving order.
 * Primitives without tags MUST NOT emit a `rigy_tags` field.
+
+In v0.12+, `rigy_tags` and `rigy_id` (see Section 13.8) coexist in the same `extras` object.
+
+---
+
+## 13.8 Primitive ID Export (v0.12)
+
+*Introduced in v0.12.*
+
+In v0.12+, each glTF primitive MUST include the Rigy primitive ID in its `extras`:
+
+```json
+"extras": { "rigy_id": "<primitive.id>" }
+```
+
+This enables debugging and tooling to map glTF primitives back to their Rigy source definitions.
+
+When combined with tags, the extras object contains both fields:
+
+```json
+"extras": { "rigy_id": "wall_south_gap_0", "rigy_tags": ["wall", "exterior"] }
+```
 
 ---
 

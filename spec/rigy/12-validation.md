@@ -49,7 +49,7 @@ A conforming implementation MUST fail and MUST NOT emit output for any of the fo
 | V25 | Duplicate instance IDs | ValidationError | v0.2 |
 | V26 | Instance references unknown import | ValidationError | v0.2 |
 | V27 | Instance references unknown mesh (local instance) | ValidationError | v0.2 |
-| V28 | ID collision across mesh/armature/anchor/instance namespaces | ValidationError | v0.2 |
+| V28 | ID collision across the global identifier namespace (`meshes[].id`, `armatures[].id`, `anchors[].id`, `instances[].id`, and `materials` keys) | ValidationError | v0.2 |
 | V29 | attach3 `from` anchor not found in imported asset | ValidationError | v0.2 |
 | V30 | attach3 `to` anchor not found in local anchors | ValidationError | v0.2 |
 | V31 | Contract violation on imported asset | ContractError | v0.2 |
@@ -62,7 +62,7 @@ A conforming implementation MUST fail and MUST NOT emit output for any of the fo
 | V38 | Primitive references unknown material ID | ValidationError | v0.6 |
 | V39 | `base_color` length != 4 | ValidationError | v0.6 |
 | V40 | Any `base_color` component outside `[0.0, 1.0]` | ValidationError | v0.6 |
-| V41 | Primitives in the same mesh do not share the same material reference | ValidationError | v0.6 |
+| V41 | Primitives in the same mesh do not share the same material reference. Enforced only when `version < "0.12"`. **NOT checked for `version >= "0.12"`.** | ValidationError | v0.6 |
 | V42 | Material ID collision or unresolved reference during import resolution | ValidationError | v0.6 |
 | V43 | `uv_roles` declares a role not in the v0.7 role vocabulary | ValidationError | v0.7 |
 | V44 | Duplicate role key in `uv_roles` | ValidationError | v0.7 |
@@ -86,6 +86,18 @@ A conforming implementation MUST fail and MUST NOT emit output for any of the fo
 | V64 | Invalid `repeat` structure or placement | ParseError | v0.10 |
 | V65 | Unresolved `${...}` token after preprocessing | ParseError | v0.10 |
 | V66 | Identifier collision after preprocessing | ValidationError | v0.10 |
+| V67 | Axis vector has length ≤ 1e-12 | ValidationError | v0.12 |
+| V68 | Expression parse error (invalid grammar, token, function, or arity) | ValidationError | v0.12 |
+| V69 | Expression references an unknown parameter | ValidationError | v0.12 |
+| V70 | Expression evaluation produced a non-finite result | ValidationError | v0.12 |
+| V71 | Expression domain error (e.g. `sqrt(x)` with `x < 0`) | ValidationError | v0.12 |
+| V72 | Multiple rotation authoring forms specified | ValidationError | v0.12 |
+| V73 | Non-finite axis / degrees / quaternion component | ValidationError | v0.12 |
+| V74 | No material resolved for primitive (v0.12+) | ValidationError | v0.12 |
+| V75 | Primitive references unknown material (v0.12+) | ValidationError | v0.12 |
+| V76 | `box_decompose.mesh` does not match containing mesh ID | ValidationError | v0.12 |
+| V77 | v0.12-only feature used under `version < "0.12"` | ValidationError | v0.12 |
+| V78 | Quaternion has length ≤ 1e-12 (zero-length / invalid) | ValidationError | v0.12 |
 | F114 | `box_decompose` generated ID collision | ValidationError | v0.11 |
 | F115 | `aabb` used with transform | ParseError | v0.11 |
 | F116 | Invalid cutout ID in `box_decompose` | ParseError | v0.11 |

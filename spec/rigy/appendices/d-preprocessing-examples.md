@@ -160,7 +160,6 @@ meshes:
     primitives:
       - macro: box_decompose
         id: south_wall
-        mesh: walls
         material: wall_mat
         surface: exterior
 
@@ -246,6 +245,167 @@ meshes:
   }]
 }
 ```
+
+---
+
+## D.6 Expression Scalars Example (v0.12)
+
+```yaml
+version: "0.12"
+
+params:
+  run: 4.0
+  rise: 1.5
+  wall_h: 2.5
+
+meshes:
+  - id: structure
+    primitives:
+      - id: rafter
+        type: box
+        dimensions:
+          x: =sqrt($run*$run + $rise*$rise)
+          y: 0.1
+          z: 4.6
+        transform:
+          translation: [0, =$wall_h + $rise/2, 0]
+```
+
+**Expanded form:**
+
+```yaml
+version: "0.12"
+
+meshes:
+  - id: structure
+    primitives:
+      - id: rafter
+        type: box
+        dimensions:
+          x: 4.272001873
+          y: 0.1
+          z: 4.6
+        transform:
+          translation: [0, 3.25, 0]
+```
+
+The expression `=sqrt($run*$run + $rise*$rise)` evaluates to `sqrt(16 + 2.25) = sqrt(18.25) ≈ 4.272001873` (quantized to `1e-9`).
+
+---
+
+## D.7 Axis–Angle Rotation Example (v0.12)
+
+```yaml
+version: "0.12"
+
+meshes:
+  - id: frame
+    primitives:
+      - id: angled_beam
+        type: box
+        dimensions: { x: 4.0, y: 0.1, z: 0.1 }
+        transform:
+          rotation_axis_angle:
+            axis: [0, 0, 1]
+            degrees: 26.565051177
+          translation: [2.0, 3.25, 0]
+```
+
+**Expanded form:**
+
+```yaml
+version: "0.12"
+
+meshes:
+  - id: frame
+    primitives:
+      - id: angled_beam
+        type: box
+        dimensions: { x: 4.0, y: 0.1, z: 0.1 }
+        transform:
+          rotation_quat: [0.0, 0.0, 0.229752920084, 0.973249013306]
+          translation: [2.0, 3.25, 0]
+```
+
+The `rotation_axis_angle` is converted to a unit quaternion (quantized to `1e-12`), with `w >= 0` sign convention enforced.
+
+---
+
+## D.8 `triangle_prism_on_plane` Example (v0.12)
+
+```yaml
+version: "0.12"
+
+materials:
+  wall:
+    base_color: [0.9, 0.85, 0.8, 1.0]
+
+meshes:
+  - id: structure
+    material: wall
+    primitives:
+      - macro: triangle_prism_on_plane
+        id: gable_front_left
+        plane:
+          origin: [0, 3.0, -2.425]
+          normal: [0, 0, -1]
+        leg_p: [-3.0, 0, 0]
+        leg_q: [0, 1.5, 0]
+        length: 0.15
+```
+
+**Expanded form:**
+
+```yaml
+version: "0.12"
+
+materials:
+  wall:
+    base_color: [0.9, 0.85, 0.8, 1.0]
+
+meshes:
+  - id: structure
+    material: wall
+    primitives:
+      - type: wedge
+        id: gable_front_left
+        dimensions:
+          x: 1.5
+          y: 0.15
+          z: 3.0
+        transform:
+          rotation_quat: [-0.5, -0.5, 0.5, 0.5]
+          translation: [-1.5, 3.75, -2.5]
+```
+
+The legs are swapped during expansion to maintain right-handed frame orientation. The rotation quaternion maps the wedge's local axes (X along base, Y extrusion, Z to apex) to the world-space directions defined by the construction plane and legs.
+
+---
+
+## D.9 `offset_mode` Example (v0.12)
+
+```yaml
+version: "0.12"
+
+materials:
+  wall:
+    base_color: [0.9, 0.85, 0.8, 1.0]
+
+meshes:
+  - id: walls
+    material: wall
+    primitives:
+      - macro: box_decompose
+        id: south
+        axis: x
+        span: [-3.0, 3.0]
+        base_y: 0.0
+        height: 3.0
+        thickness: 0.15
+        offset_mode: neg_face   # negative-Z face at Z=0
+```
+
+**Effect:** `offset_mode: neg_face` computes `offset = thickness / 2 = 0.075`, so the wall centerline is at Z=0.075 and the negative-Z face is at Z=0.0.
 
 ---
 

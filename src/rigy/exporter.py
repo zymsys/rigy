@@ -12,11 +12,27 @@ import pygltflib
 from rigy.composition import ComposedAsset, ResolvedInstance
 from rigy.dqs import evaluate_pose
 from rigy.errors import ExportError
-from rigy.models import Pose, RigySpec
+from rigy.models import Mesh, Pose, Primitive, RigySpec
 from rigy.skinning import SkinData, compute_skinning
-from rigy.tessellation import tessellate_mesh
+from rigy.tessellation import MeshData, tessellate_mesh, tessellate_primitive
 from rigy.uv import generate_uv_sets
 from rigy.warning_policy import WarningPolicy
+
+
+def _spec_version(spec: RigySpec) -> tuple[int, int]:
+    """Parse spec version string to (major, minor) tuple."""
+    parts = spec.version.split(".")
+    if len(parts) == 2:
+        try:
+            return (int(parts[0]), int(parts[1]))
+        except ValueError:
+            pass
+    return (0, 1)
+
+
+def _resolve_material(prim: Primitive, mesh: Mesh) -> str | None:
+    """Resolve material for a primitive: primitive.material ?? mesh.material."""
+    return prim.material or mesh.material
 
 
 def export_gltf(
@@ -561,6 +577,20 @@ def _build_spec_meshes(
     warning_policy: WarningPolicy | None = None,
 ) -> None:
     """Build mesh/bone/skin nodes for a spec and append to scene_nodes."""
+    version = _spec_version(spec)
+    if version >= (0, 12):
+        _build_spec_meshes_v012(
+            gltf,
+            spec,
+            blob_data,
+            material_map,
+            scene_nodes,
+            name_prefix=name_prefix,
+            yaml_dir=yaml_dir,
+            warning_policy=warning_policy,
+        )
+        return
+
     # Build binding lookup
     binding_map: dict[str, tuple] = {}  # mesh_id -> (binding, armature)
     for binding in spec.bindings:
@@ -575,19 +605,7 @@ def _build_spec_meshes(
             continue
 
         # Collect materials
-        for prim in mesh_def.primitives:
-            if prim.material and prim.material not in material_map:
-                mat_idx = len(gltf.materials)
-                if prim.material in spec.materials:
-                    gltf.materials.append(_build_material(prim.material, spec))
-                else:
-                    gltf.materials.append(
-                        pygltflib.Material(
-                            name=prim.material,
-                            pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(),
-                        )
-                    )
-                material_map[prim.material] = mat_idx
+        _collect_materials(gltf, spec, mesh_def, material_map)
 
         # Write position data
         pos_offset = len(blob_data)
@@ -920,4 +938,336 @@ def _build_spec_meshes(
             )
 
             # Assign skin to mesh node
+            gltf.nodes[mesh_node_idx].skin = skin_idx
+
+
+def _collect_materials(
+    gltf: pygltflib.GLTF2,
+    spec: RigySpec,
+    mesh_def: Mesh,
+    material_map: dict[str, int],
+) -> None:
+    """Collect and register materials for a mesh (both mesh-level and primitive-level)."""
+    # Mesh-level material (v0.12+)
+    if mesh_def.material and mesh_def.material not in material_map:
+        _register_material(gltf, spec, mesh_def.material, material_map)
+
+    # Primitive-level materials
+    for prim in mesh_def.primitives:
+        if prim.material and prim.material not in material_map:
+            _register_material(gltf, spec, prim.material, material_map)
+
+
+def _register_material(
+    gltf: pygltflib.GLTF2,
+    spec: RigySpec,
+    mat_id: str,
+    material_map: dict[str, int],
+) -> None:
+    """Register a single material in the glTF and material_map."""
+    mat_idx = len(gltf.materials)
+    if mat_id in spec.materials:
+        gltf.materials.append(_build_material(mat_id, spec))
+    else:
+        gltf.materials.append(
+            pygltflib.Material(
+                name=mat_id,
+                pbrMetallicRoughness=pygltflib.PbrMetallicRoughness(),
+            )
+        )
+    material_map[mat_id] = mat_idx
+
+
+def _write_buffer_view_and_accessor(
+    gltf: pygltflib.GLTF2,
+    blob_data: bytearray,
+    data_array: np.ndarray,
+    component_type: int,
+    accessor_type: str,
+    target: int | None = None,
+    *,
+    include_min_max: bool = False,
+) -> int:
+    """Write a buffer view and accessor, returning the accessor index."""
+    offset = len(blob_data)
+    data_bytes = data_array.tobytes()
+    blob_data.extend(data_bytes)
+
+    bv_idx = len(gltf.bufferViews)
+    bv = pygltflib.BufferView(
+        buffer=0,
+        byteOffset=offset,
+        byteLength=len(data_bytes),
+    )
+    if target is not None:
+        bv.target = target
+    gltf.bufferViews.append(bv)
+
+    acc_kwargs: dict = {
+        "bufferView": bv_idx,
+        "byteOffset": 0,
+        "componentType": component_type,
+        "count": len(data_array),
+        "type": accessor_type,
+    }
+    if include_min_max:
+        acc_kwargs["min"] = data_array.min(axis=0).tolist()
+        acc_kwargs["max"] = data_array.max(axis=0).tolist()
+
+    acc_idx = len(gltf.accessors)
+    gltf.accessors.append(pygltflib.Accessor(**acc_kwargs))
+    return acc_idx
+
+
+def _build_spec_meshes_v012(
+    gltf: pygltflib.GLTF2,
+    spec: RigySpec,
+    blob_data: bytearray,
+    material_map: dict[str, int],
+    scene_nodes: list[int],
+    name_prefix: str = "",
+    *,
+    yaml_dir: Path | None = None,
+    warning_policy: WarningPolicy | None = None,
+) -> None:
+    """Build mesh/bone/skin nodes for a v0.12+ spec — one glTF primitive per Rigy primitive."""
+    # Build binding lookup
+    binding_map: dict[str, tuple] = {}  # mesh_id -> (binding, armature)
+    for binding in spec.bindings:
+        arm = next((a for a in spec.armatures if a.id == binding.armature_id), None)
+        if arm:
+            binding_map[binding.mesh_id] = (binding, arm)
+
+    for mesh_def in spec.meshes:
+        # Tessellate each primitive individually
+        per_prim_data: list[tuple[Primitive, MeshData]] = []
+        for prim in mesh_def.primitives:
+            md = tessellate_primitive(prim, spec.tessellation_profile)
+            per_prim_data.append((prim, md))
+
+        if not per_prim_data:
+            continue
+
+        # Also compute merged data + prim_ranges for skinning and UV
+        mesh_data, prim_ranges = tessellate_mesh(mesh_def, spec.tessellation_profile)
+        if len(mesh_data.positions) == 0:
+            continue
+
+        # Collect materials (mesh-level + primitive-level)
+        _collect_materials(gltf, spec, mesh_def, material_map)
+
+        # Generate UV sets on merged positions
+        uv_arrays = generate_uv_sets(mesh_def, mesh_data.positions, prim_ranges)
+
+        # Compute skinning on merged data (if bound)
+        skin_data: SkinData | None = None
+        if mesh_def.id in binding_map:
+            binding, armature = binding_map[mesh_def.id]
+            skin_data = compute_skinning(
+                binding,
+                armature,
+                prim_ranges,
+                len(mesh_data.positions),
+                positions=mesh_data.positions,
+                yaml_dir=yaml_dir,
+                warning_policy=warning_policy,
+            )
+
+        # Build one glTF primitive per Rigy primitive
+        gltf_prims: list[pygltflib.Primitive] = []
+        for prim, prim_md in per_prim_data:
+            v_start, v_end = prim_ranges[prim.id]
+
+            # Position accessor (per-primitive)
+            pos_f32 = prim_md.positions.astype(np.float32)
+            pos_acc_idx = _write_buffer_view_and_accessor(
+                gltf,
+                blob_data,
+                pos_f32,
+                pygltflib.FLOAT,
+                pygltflib.VEC3,
+                pygltflib.ARRAY_BUFFER,
+                include_min_max=True,
+            )
+
+            # Normal accessor (per-primitive)
+            norm_f32 = prim_md.normals.astype(np.float32)
+            norm_acc_idx = _write_buffer_view_and_accessor(
+                gltf,
+                blob_data,
+                norm_f32,
+                pygltflib.FLOAT,
+                pygltflib.VEC3,
+                pygltflib.ARRAY_BUFFER,
+            )
+
+            # Index accessor (per-primitive, 0-based indices)
+            idx_u32 = prim_md.indices.astype(np.uint32)
+            idx_acc_idx = _write_buffer_view_and_accessor(
+                gltf,
+                blob_data,
+                idx_u32,
+                pygltflib.UNSIGNED_INT,
+                pygltflib.SCALAR,
+                pygltflib.ELEMENT_ARRAY_BUFFER,
+            )
+
+            attributes = pygltflib.Attributes(
+                POSITION=pos_acc_idx,
+                NORMAL=norm_acc_idx,
+            )
+
+            # UV accessors (slice from merged UV arrays)
+            for uv_idx, uv_arr in enumerate(uv_arrays):
+                uv_slice = uv_arr[v_start:v_end].astype(np.float32)
+                uv_acc_idx = _write_buffer_view_and_accessor(
+                    gltf,
+                    blob_data,
+                    uv_slice,
+                    pygltflib.FLOAT,
+                    pygltflib.VEC2,
+                    pygltflib.ARRAY_BUFFER,
+                )
+                setattr(attributes, f"TEXCOORD_{uv_idx}", uv_acc_idx)
+
+            # Skinning data (slice from merged)
+            if skin_data is not None:
+                joints_slice = skin_data.joints[v_start:v_end].astype(np.uint16)
+                joints_acc_idx = _write_buffer_view_and_accessor(
+                    gltf,
+                    blob_data,
+                    joints_slice,
+                    pygltflib.UNSIGNED_SHORT,
+                    pygltflib.VEC4,
+                    pygltflib.ARRAY_BUFFER,
+                )
+                weights_slice = skin_data.weights[v_start:v_end].astype(np.float32)
+                weights_acc_idx = _write_buffer_view_and_accessor(
+                    gltf,
+                    blob_data,
+                    weights_slice,
+                    pygltflib.FLOAT,
+                    pygltflib.VEC4,
+                    pygltflib.ARRAY_BUFFER,
+                )
+                attributes.JOINTS_0 = joints_acc_idx
+                attributes.WEIGHTS_0 = weights_acc_idx
+
+            # Resolve material: primitive.material ?? mesh.material
+            resolved_mat = _resolve_material(prim, mesh_def)
+            mat_idx = material_map.get(resolved_mat) if resolved_mat else None
+
+            gltf_prim = pygltflib.Primitive(
+                attributes=attributes,
+                indices=idx_acc_idx,
+                material=mat_idx,
+            )
+
+            # extras: rigy_id + rigy_tags
+            extras: dict = {"rigy_id": prim.id}
+            if prim.tags:
+                extras["rigy_tags"] = list(prim.tags)
+            gltf_prim.extras = extras
+
+            gltf_prims.append(gltf_prim)
+
+        # Create glTF mesh with all primitives
+        mesh_idx = len(gltf.meshes)
+        mesh_name = name_prefix + (mesh_def.name or mesh_def.id)
+        gltf.meshes.append(pygltflib.Mesh(name=mesh_name, primitives=gltf_prims))
+
+        # Create mesh node
+        mesh_node_idx = len(gltf.nodes)
+        gltf.nodes.append(pygltflib.Node(name=mesh_name, mesh=mesh_idx))
+        scene_nodes.append(mesh_node_idx)
+
+        # Build armature nodes and skin (same as pre-0.12)
+        if skin_data is not None:
+            binding, armature = binding_map[mesh_def.id]
+
+            bone_head_map = {bone.id: bone.head for bone in armature.bones}
+            bone_parent_map = {
+                bone.id: bone.parent if bone.parent != "none" else None for bone in armature.bones
+            }
+
+            bone_node_indices: dict[str, int] = {}
+            for bone in armature.bones:
+                bone_node_idx = len(gltf.nodes)
+                bone_node_indices[bone.id] = bone_node_idx
+
+                parent_id = bone_parent_map[bone.id]
+                if parent_id is not None and parent_id in bone_head_map:
+                    ph = bone_head_map[parent_id]
+                    translation = [
+                        float(bone.head[0] - ph[0]),
+                        float(bone.head[1] - ph[1]),
+                        float(bone.head[2] - ph[2]),
+                    ]
+                else:
+                    translation = [
+                        float(bone.head[0]),
+                        float(bone.head[1]),
+                        float(bone.head[2]),
+                    ]
+
+                gltf.nodes.append(
+                    pygltflib.Node(
+                        name=name_prefix + bone.id,
+                        translation=translation,
+                    )
+                )
+
+            root_bone_nodes = []
+            for bone in armature.bones:
+                bone_idx = bone_node_indices[bone.id]
+                if bone.parent == "none":
+                    root_bone_nodes.append(bone_idx)
+                else:
+                    parent_idx = bone_node_indices.get(bone.parent)
+                    if parent_idx is not None:
+                        if gltf.nodes[parent_idx].children is None:
+                            gltf.nodes[parent_idx].children = []
+                        gltf.nodes[parent_idx].children.append(bone_idx)
+
+            for rbn in root_bone_nodes:
+                scene_nodes.append(rbn)
+
+            ibm_offset = len(blob_data)
+            ibm_col_major = np.ascontiguousarray(skin_data.inverse_bind_matrices.transpose(0, 2, 1))
+            ibm_bytes = ibm_col_major.astype(np.float32).tobytes()
+            blob_data.extend(ibm_bytes)
+
+            ibm_bv_idx = len(gltf.bufferViews)
+            gltf.bufferViews.append(
+                pygltflib.BufferView(
+                    buffer=0,
+                    byteOffset=ibm_offset,
+                    byteLength=len(ibm_bytes),
+                )
+            )
+
+            ibm_acc_idx = len(gltf.accessors)
+            gltf.accessors.append(
+                pygltflib.Accessor(
+                    bufferView=ibm_bv_idx,
+                    byteOffset=0,
+                    componentType=pygltflib.FLOAT,
+                    count=len(skin_data.inverse_bind_matrices),
+                    type=pygltflib.MAT4,
+                )
+            )
+
+            joint_node_list = [bone_node_indices[name] for name in skin_data.joint_names]
+            skeleton_root = root_bone_nodes[0] if root_bone_nodes else None
+
+            skin_idx = len(gltf.skins)
+            gltf.skins.append(
+                pygltflib.Skin(
+                    name=name_prefix + (armature.name or armature.id),
+                    joints=joint_node_list,
+                    skeleton=skeleton_root,
+                    inverseBindMatrices=ibm_acc_idx,
+                )
+            )
+
             gltf.nodes[mesh_node_idx].skin = skin_idx

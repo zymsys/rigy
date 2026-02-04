@@ -15,7 +15,7 @@ materials:
 ```
 
 * Keys are **material IDs**
-* Material IDs share the same ID namespace and uniqueness rules as other Rigy identifiers
+* Material IDs belong to the **global identifier namespace**, which includes: `meshes[].id`, `armatures[].id`, `anchors[].id`, `instances[].id`, and `materials` keys. An ID collision between any of these is a ValidationError (V28).
 * Duplicate material IDs are a hard ValidationError (V37)
 
 ---
@@ -79,11 +79,48 @@ The default material is conceptual and MUST NOT require an explicit entry in `ma
 
 ---
 
-## 8.5 Mesh-Level Material Constraint
+## 8.5 Mesh-Level Default Material (v0.12)
 
-Rigy exporters emit **one glTF primitive per Rigy mesh**, merging all Rigy primitives into a single draw call.
+*Introduced in v0.12.*
 
-To preserve determinism and avoid exporter ambiguity:
+In v0.12+, meshes MAY declare a default material:
+
+```yaml
+meshes:
+  - id: walls
+    material: brick
+    primitives:
+      - id: wall_a
+        type: box
+        # inherits material: brick
+      - id: window_frame
+        type: box
+        material: wood  # overrides mesh default
+```
+
+The resolution order is:
+
+```
+primitive.material ?? mesh.material
+```
+
+If no material resolves and a `materials` table is defined, raise **ValidationError V74**.
+
+The `mesh.material` field requires `version: "0.12"` or later (V77).
+
+---
+
+## 8.6 Material Resolution (v0.12)
+
+### v0.12+ Behavior
+
+In v0.12+, each Rigy primitive emits one glTF primitive, enabling different materials per primitive within a mesh. The one-material-per-mesh constraint (V41) is **superseded**.
+
+Primitives within a mesh MAY reference different material IDs. Each glTF primitive carries its own material index.
+
+### Legacy Behavior (v0.1–v0.11)
+
+For `version < "0.12"`:
 
 > **All primitives within a single Rigy mesh MUST reference the same material ID, or all MUST omit the material field.**
 
@@ -91,11 +128,15 @@ Violation of this rule is a ValidationError (V41).
 
 > **Note:** This rule is based on *material reference identity*, not effective color equivalence. A primitive omitting `material` is not equivalent to explicitly referencing a material whose `base_color` equals the default.
 
-This restriction MAY be relaxed in a future version when per-primitive glTF emission is standardized.
+---
+
+## 8.7 Default Material Clarification
+
+The implicit default material (`[1.0, 1.0, 1.0, 1.0]`) still applies when no `materials` table is defined. V74 only fires when a `materials` table exists but the resolution chain (`primitive.material ?? mesh.material`) fails to resolve.
 
 ---
 
-## 8.6 Material UV Role References
+## 8.8 Material UV Role References
 
 Materials MAY reference UV roles symbolically:
 
@@ -117,7 +158,7 @@ Validation rules:
 
 ---
 
-## 8.7 Import Namespacing for Materials
+## 8.9 Import Namespacing for Materials
 
 Imported assets introduce a namespace for their materials, consistent with existing import resolution rules.
 
@@ -128,7 +169,7 @@ Material references MUST resolve unambiguously. Failure to resolve a material re
 
 ---
 
-## 8.8 Validation
+## 8.10 Validation
 
 | ID | Check | Error Type |
 |----|-------|-----------|
@@ -136,8 +177,10 @@ Material references MUST resolve unambiguously. Failure to resolve a material re
 | V38 | Primitive references unknown material ID | ValidationError |
 | V39 | `base_color` length != 4 | ValidationError |
 | V40 | Any `base_color` component outside `[0.0, 1.0]` | ValidationError |
-| V41 | Primitives in the same mesh do not share the exact same material reference | ValidationError |
+| V41 | Primitives in the same mesh do not share the exact same material reference. Enforced only when `version < "0.12"`. **NOT checked for `version >= "0.12"`.** | ValidationError |
 | V42 | Material ID collision or unresolved reference during import resolution | ValidationError |
+| V74 | No material resolved for primitive (`primitive.material ?? mesh.material` fails when `materials` table exists) | ValidationError |
+| V75 | Primitive references unknown material | ValidationError |
 
 **Parse vs Validation Notes:**
 

@@ -90,8 +90,13 @@ def _apply_transform(mesh_data: MeshData, primitive: Primitive) -> MeshData:
     positions = mesh_data.positions.copy()
     normals = mesh_data.normals.copy()
 
-    # Apply rotation first (Euler XYZ)
-    if primitive.transform.rotation_euler is not None:
+    # Apply rotation first — prefer rotation_quat (v0.12+), fall back to rotation_euler
+    if primitive.transform.rotation_quat is not None:
+        qx, qy, qz, qw = primitive.transform.rotation_quat
+        rot = _quat_to_matrix(qx, qy, qz, qw)
+        positions = (rot @ positions.T).T
+        normals = (rot @ normals.T).T
+    elif primitive.transform.rotation_euler is not None:
         rx, ry, rz = primitive.transform.rotation_euler
         rot = _euler_to_matrix(rx, ry, rz)
         positions = (rot @ positions.T).T
@@ -117,6 +122,31 @@ def _euler_to_matrix(rx: float, ry: float, rz: float) -> np.ndarray:
     Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]], dtype=np.float64)
 
     return Rz @ Ry @ Rx
+
+
+def _quat_to_matrix(qx: float, qy: float, qz: float, qw: float) -> np.ndarray:
+    """Convert quaternion (x, y, z, w) to a 3x3 rotation matrix."""
+    x2 = qx + qx
+    y2 = qy + qy
+    z2 = qz + qz
+    xx = qx * x2
+    xy = qx * y2
+    xz = qx * z2
+    yy = qy * y2
+    yz = qy * z2
+    zz = qz * z2
+    wx = qw * x2
+    wy = qw * y2
+    wz = qw * z2
+
+    return np.array(
+        [
+            [1 - (yy + zz), xy - wz, xz + wy],
+            [xy + wz, 1 - (xx + zz), yz - wx],
+            [xz - wy, yz + wx, 1 - (xx + yy)],
+        ],
+        dtype=np.float64,
+    )
 
 
 def _tessellate_box(dims: dict[str, float]) -> MeshData:
