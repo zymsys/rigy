@@ -217,6 +217,13 @@ class TestRigySpec:
         assert len(spec.anchors) == 1
         assert spec.anchors[0].id == "a1"
 
+    def test_geometry_checks_allowed(self):
+        spec = RigySpec(
+            version="0.11",
+            geometry_checks={"checks": [{"id": "c1", "expr": "$missing"}]},
+        )
+        assert spec.geometry_checks["checks"][0]["expr"] == "$missing"
+
 
 class TestSkinningSolver:
     def test_lbs_accepted(self):

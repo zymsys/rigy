@@ -250,3 +250,21 @@ class TestDeterminism:
         _compile(full_humanoid_yaml, out1)
         _compile(full_humanoid_yaml, out2)
         assert out1.read_bytes() == out2.read_bytes()
+
+    def test_geometry_checks_do_not_affect_export_bytes(self, minimal_mesh_yaml, tmp_path):
+        with_checks_yaml = (
+            minimal_mesh_yaml
+            + """
+geometry_checks:
+  checks:
+    - id: c1
+      expr: $missing
+    - id: c2
+      expr: ${leftover}
+"""
+        )
+        out1 = tmp_path / "no_checks.glb"
+        out2 = tmp_path / "with_checks.glb"
+        _compile(minimal_mesh_yaml, out1)
+        _compile(with_checks_yaml, out2)
+        assert out1.read_bytes() == out2.read_bytes()

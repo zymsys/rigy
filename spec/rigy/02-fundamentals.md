@@ -57,6 +57,7 @@ Preprocessing in v0.10+:
 
 * Determinism applies **only to correct behavior as defined by the spec**
 * Outputs produced by incorrect behavior are **not protected**
+* Tooling-only top-level blocks (currently `geometry_checks`) are non-semantic and MUST NOT affect deterministic output
 
 ---
 

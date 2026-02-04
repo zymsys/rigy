@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -333,6 +333,8 @@ class RigySpec(BaseModel):
     anchors: list[Anchor] = []
     imports: dict[str, ImportDef] = {}
     instances: list[Instance] = []
+    # Tooling-only block: accepted but semantically ignored by compile/export.
+    geometry_checks: Any | None = None
 
 
 # --- Resolved asset dataclass (used by import resolution) ---

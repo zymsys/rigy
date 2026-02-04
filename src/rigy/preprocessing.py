@@ -17,6 +17,7 @@ _PARAM_REF_RE = re.compile(r"^\$([A-Za-z_][A-Za-z0-9_]*)$")
 _EMBEDDED_PARAM_RE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*")
 _INDEX_TOKEN_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _UNRESOLVED_TOKEN_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")
+_MISSING = object()
 
 
 def preprocess(data: dict, add_provenance_comments: bool = False) -> dict:
@@ -24,6 +25,7 @@ def preprocess(data: dict, add_provenance_comments: bool = False) -> dict:
     strips the params key, checks for unresolved tokens, then expands
     AABB and macros."""
     data = copy.deepcopy(data)
+    geometry_checks = data.pop("geometry_checks", _MISSING)
     _expand_repeats(data, add_provenance_comments=add_provenance_comments)
 
     # Validate and substitute params
@@ -39,6 +41,8 @@ def preprocess(data: dict, add_provenance_comments: bool = False) -> dict:
     _check_no_unresolved_tokens(data)
     _expand_aabb(data, add_provenance_comments=add_provenance_comments)
     _expand_macros(data, add_provenance_comments=add_provenance_comments)
+    if geometry_checks is not _MISSING:
+        data["geometry_checks"] = geometry_checks
     return data
 
 

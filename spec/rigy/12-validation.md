@@ -90,6 +90,8 @@ A conforming implementation MUST fail and MUST NOT emit output for any of the fo
 | F115 | `aabb` used with transform | ParseError | v0.11 |
 | F116 | Invalid cutout ID in `box_decompose` | ParseError | v0.11 |
 
+Exception: the tooling-only top-level key `geometry_checks` is allowed and is ignored by validation.
+
 ---
 
 ## 12.3 Soft Errors / Warnings (MUST warn, MAY continue)

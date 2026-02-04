@@ -52,6 +52,23 @@ This rule applies universally, including:
 
 No extension or vendor-specific keys are permitted unless explicitly defined by the specification.
 
+### Tooling-Only Top-Level Allowance
+
+A small, explicit allowlist of tooling-only top-level blocks MAY appear and MUST be ignored by the Rigy compiler for geometry/export behavior.
+
+For v0.11, the allowlist contains exactly:
+
+* `geometry_checks`
+
+`geometry_checks` is:
+
+* optional (never required)
+* ignored by validation
+* ignored by determinism
+* ignored by export
+
+Its contents are non-semantic for Rigy compilation and MUST NOT influence any Rigy behavior.
+
 ---
 
 ## 10.2 `params` — Compile-Time Constants (Normative)

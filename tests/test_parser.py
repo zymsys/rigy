@@ -227,6 +227,28 @@ meshes:
         assert spec.meshes[0].primitives[1].id == "box1"
         assert spec.meshes[0].primitives[2].id == "box2"
 
+    def test_geometry_checks_toplevel_block_is_accepted(self):
+        yaml_str = """\
+version: "0.11"
+units: meters
+geometry_checks:
+  checks:
+    - id: c1
+      expr: $missing
+    - id: c2
+      expr: ${leftover}
+meshes:
+  - id: m
+    primitives:
+      - type: box
+        id: p
+        dimensions: { x: 1, y: 1, z: 1 }
+"""
+        spec = parse_yaml(yaml_str)
+        assert isinstance(spec.geometry_checks, dict)
+        assert spec.geometry_checks["checks"][0]["expr"] == "$missing"
+        assert spec.geometry_checks["checks"][1]["expr"] == "${leftover}"
+
     def test_rotation_degrees_parsed_and_converted(self):
         yaml_str = """\
 version: "0.11"

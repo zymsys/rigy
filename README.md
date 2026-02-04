@@ -376,6 +376,8 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **Geometry inspection (tooling)** — `rigy inspect` reports model bounds, per-primitive AABBs/centers/extents, face normals/planes for surface-key primitives, and optional pairwise AABB gap/overlap metrics. Inspection is observational only and does not affect validation outcomes or GLB bytes.
 
+**Tooling-only top-level block (`geometry_checks`)** — Rigy accepts an optional top-level `geometry_checks` key for external tooling workflows. The compiler treats it as non-semantic: ignored by validation, determinism, and export behavior.
+
 **Conformance fixtures** — Three positive test cases (H110–H112) covering AABB, box_decompose with single cutout, and box_decompose with multiple cutouts. Three negative test cases (F114–F116) covering macro ID collision, AABB with transform, and invalid cutout ID.
 
 ### Rigs v0.1 — Scene composition

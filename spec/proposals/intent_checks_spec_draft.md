@@ -1,210 +1,284 @@
-# Draft Spec: Intent Checks for Geometric Feedback (Rigy v0.12 proposal)
+# Rigy Tooling: `geometry_checks` (v1)
+
+*Status: Compiler / tooling feature (non-language, non-normative)*
+*Goal: Optional, read-only geometric assertions to catch “valid-but-wrong” assemblies.*
 
 ## 1. Purpose
 
-This proposal adds optional geometric intent checks to catch "valid-but-wrong" assemblies (e.g., rotated roofs, misaligned gables) without adding new primitives.
+`geometry_checks` provides optional, declarative checks over compiled geometry to detect **spatial/orientation mismatches** and **unexpected clearances/penetrations** *without rendering*.
 
-Intent checks are diagnostics over transformed geometry.
+Checks are evaluated over the same computed metrics produced by `rigy inspect` (AABBs, face normals/planes, optional pairwise AABB gaps). They:
+
+* MUST be read-only
+* MUST NOT modify geometry
+* MUST NOT affect exported GLB bytes (unless the user opts into a “fail” policy that only changes the process exit status)
 
 ## 2. Non-goals
 
-- No changes to primitive vocabulary.
-- No changes to tessellation outputs.
-- No snapping or automatic geometry correction.
-- No impact on deterministic GLB bytes.
+* No new primitives or macros
+* No snapping, correction, or geometry mutation
+* No participation in Rigy conformance/determinism
+* No replacement for semantic/domain validation in upstream authoring tools
 
-## 3. Top-level schema
+## 3. Schema
+
+`geometry_checks` is an optional top-level block in a Rigy document **or** may be supplied externally (e.g., `--geometry-checks <file>`). This spec defines the content model, not the transport.
 
 ```yaml
-intent_checks:
-  default_tolerance: 0.01
+geometry_checks:
+  version: 1
+  default_tolerance: 0.001   # optional, > 0
   checks:
-    - id: ridge_above_eave
+    - id: check_0
       type: point_order
-      a: { primitive_id: roof_front, point: max_y }
-      b: { primitive_id: front_wall_gap_0, point: max_y }
+      a: { primitive_id: part_a, point: max_y }
+      b: { primitive_id: part_b, point: max_y }
       relation: gt
       min_delta: 0.2
 ```
 
 ### 3.1 Fields
 
-- `intent_checks` (optional)
-  - `default_tolerance` (optional float, > 0, default `0.001`)
-  - `checks` (required non-empty list if `intent_checks` is present)
+* `geometry_checks` (optional)
+
+  * `version` (required) — integer, must be `1` for this spec
+  * `default_tolerance` (optional float, > 0, default `0.001`)
+  * `checks` (required if `geometry_checks` exists) — non-empty list
 
 Each check:
-- `id` (required unique identifier)
-- `type` (required string)
-- type-specific fields
 
-## 4. Evaluation stage
+* `id` (required) — unique identifier within `checks`
+* `type` (required) — string in the v1 vocabulary
+* type-specific fields (see §6)
 
-Intent checks MUST run after:
-1. preprocessing expansion
-2. parsing
-3. semantic validation
-4. transform application
+### 3.2 Identifier Rules
 
-and before export finalization.
+* `checks[].id` MUST be unique within the list
+* `primitive_id` references MUST refer to a resolved primitive ID after preprocessing/symmetry
 
-Checks MUST be read-only and MUST NOT modify scene state.
+## 4. Evaluation Stage
 
-## 5. Check types (v1)
+`geometry_checks` MUST be evaluated only if explicitly enabled (e.g., `rigy inspect --geometry-checks` or `rigy compile --geometry-checks`).
 
-## 5.1 `coplanar_faces`
+When enabled, checks MUST run:
 
-Asserts two primitive faces are coplanar within tolerance.
+```
+preprocess → parse → expand symmetry → validate → tessellate → compute inspect metrics → evaluate checks
+```
+
+Defaults:
+
+* Checks are evaluated on **asset-space**, **rest**, **pre-skin** tessellated geometry (same as `rigy inspect` default).
+* If future tooling adds “post-skin” or “pose” inspection, it MUST be selected explicitly, and checks must state which evaluation space they target.
+
+## 5. Results Model
+
+Check evaluation produces **results**, not Rigy validation errors.
+
+Each check yields a result object containing:
+
+* `id`
+* `type`
+* `status`: `pass | fail`
+* `measured`: type-specific measured values
+* `expected`: thresholds/ranges used
+* optional `notes`
+
+The compiler/tool MUST NOT treat a failed check as a parse/validation error by default.
+
+## 6. Check Types (v1)
+
+### 6.1 `coplanar_faces`
+
+Asserts two planar faces are coplanar within a maximum distance.
 
 ```yaml
-- id: roof_front_matches_gable_front
+- id: face_coplanar
   type: coplanar_faces
-  a: { primitive_id: roof_front, face: "+z" }
-  b: { primitive_id: gable_front_left, face: "slope" }
+  a: { primitive_id: p0, face: "+z" }
+  b: { primitive_id: p1, face: "slope" }
   max_distance: 0.03
 ```
 
 Rules:
-- `face` MUST be valid for primitive type.
-- Distance metric: max signed point-to-plane distance of sampled face vertices.
-- Pass if distance <= `max_distance`.
 
-## 5.2 `gap_axis`
+* `face` MUST be a valid surface key for the referenced primitive type (see §7)
+* Metric:
 
-Asserts AABB separation along one axis falls in a range.
+  * Let plane `Pa` be `(n_a, d_a)` for face `a`
+  * Sample a finite set of points on face `b` (see Sampling)
+  * Compute `dist_i = abs(n_a · p_i + d_a)` (point-to-plane distance)
+  * `measured.max_distance = max(dist_i)`
+* Pass if `measured.max_distance <= max_distance`
+
+Sampling (deterministic):
+
+* For `box` and `wedge` (flat-shaded, surface-keyed), the sample set MUST be the **emitted face vertices** for that surface, in canonical vertex emission order.
+
+### 6.2 `gap_axis`
+
+Asserts AABB separation along a single axis is within `[min, max]`.
 
 ```yaml
-- id: roof_overhang_z
+- id: axis_gap_ok
   type: gap_axis
-  a: { primitive_id: roof_front }
-  b: { primitive_id: front_wall_gap_0 }
+  a: { primitive_id: p0 }
+  b: { primitive_id: p1 }
   axis: z
-  min: 0.0
-  max: 0.35
+  min: -0.05
+  max: 0.10
 ```
 
 Rules:
-- Compute world AABBs for both primitives.
-- Compute signed gap/overlap on axis (`<0` overlap, `>0` gap).
-- Pass if value in `[min, max]`.
 
-## 5.3 `point_order`
+* Compute asset-space AABBs for `a` and `b`
+* Compute signed axis gap `g`:
 
-Asserts one derived scalar point value is above/below another.
+  * If `A.max[axis] < B.min[axis]`: `g = B.min - A.max` (positive gap)
+  * Else if `B.max[axis] < A.min[axis]`: `g = A.min - B.max` (positive gap)
+  * Else: `g = -overlap` where `overlap = min(A.max, B.max) - max(A.min, B.min)` (negative means penetration)
+* Pass if `min <= g <= max`
+
+### 6.3 `point_order`
+
+Asserts one derived scalar value is above/below another, optionally with a minimum delta.
 
 ```yaml
-- id: ridge_above_eave
+- id: order_ok
   type: point_order
-  a: { primitive_id: roof_front, point: max_y }
-  b: { primitive_id: front_wall_gap_0, point: max_y }
+  a: { primitive_id: p0, point: max_y }
+  b: { primitive_id: p1, point: max_y }
   relation: gt
   min_delta: 0.2
 ```
 
-Allowed points:
-- `min_x|max_x|min_y|max_y|min_z|max_z|center_x|center_y|center_z`
+Allowed `point` values:
+
+* `min_x|max_x|min_y|max_y|min_z|max_z|center_x|center_y|center_z`
 
 Relations:
-- `gt`, `ge`, `lt`, `le`, `eq`
 
-## 5.4 `normal_alignment`
+* `gt`, `ge`, `lt`, `le`, `eq`
 
-Asserts a face normal aligns to a target axis within angular tolerance.
+Semantics:
+
+* Compute scalar `A` from `a`
+* Compute scalar `B` from `b`
+* Evaluate relation, with optional `min_delta`:
+
+  * For `gt`: require `A > B + min_delta` (if `min_delta` present, else `A > B`)
+  * For `ge`: require `A >= B + min_delta` (if present)
+  * For `lt/le`: analogous
+  * For `eq`: require `abs(A - B) <= tolerance` where `tolerance` = check’s `tolerance` or `default_tolerance`
+
+### 6.4 `normal_alignment`
+
+Asserts a face normal aligns to a target direction within an angular tolerance.
 
 ```yaml
-- id: roof_front_slopes_pos_x
+- id: normal_ok
   type: normal_alignment
-  a: { primitive_id: roof_front, face: "+x" }
+  a: { primitive_id: p0, face: "+x" }
   target_axis: [1, 0, 0]
   max_angle_deg: 30
 ```
 
 Rules:
-- `target_axis` MUST be finite non-zero vector.
-- Angle from world face normal to normalized `target_axis` must be <= `max_angle_deg`.
 
-## 6. Error model additions
+* `target_axis` MUST be a finite non-zero vector
+* Face normal `n` MUST be the asset-space face normal from surface-key diagnostics
+* Normalize `t = normalize(target_axis)`
+* Compute `angle = acos(clamp(dot(n, t), -1, 1))` in radians, then convert to degrees
+* Pass if `angle <= max_angle_deg`
 
-### 6.1 Hard validation errors
+Reported:
 
-- `V67`: duplicate intent check IDs
-- `V68`: unknown primitive ID referenced
-- `V69`: invalid face key for primitive type
-- `V70`: invalid numeric bounds/tolerance/range
-- `V71`: unknown intent check type
+* `measured.angle_deg`
 
-### 6.2 Warnings (default behavior)
+## 7. Surface Keys
 
-- `W10`: `coplanar_faces` failed
-- `W11`: `gap_axis` out of range
-- `W12`: `point_order` failed
-- `W13`: `normal_alignment` failed
+Checks that reference `face` (`coplanar_faces`, `normal_alignment`) may only be used with primitives that define surface keys.
 
-Warnings MUST include:
-- check `id`
-- measured value(s)
-- threshold/range
+For v1:
 
-## 7. CLI behavior
+* `box`: `+x`, `-x`, `+y`, `-y`, `+z`, `-z`
+* `wedge`: `-z`, `-x`, `slope`, `-y`, `+y`
 
-Default:
-- Emit warnings and continue compilation.
+If a primitive type does not define surface keys, referencing `face` is a **check definition error** (see §8).
 
-Optional strict mode:
-- `--fail-on-intent` promotes `W10..W13` to fatal failure.
+## 8. Errors vs Failures
 
-## 8. Determinism contract
+### 8.1 Check Definition Errors (Tooling Errors)
 
-A conforming implementation MUST produce byte-identical GLB output regardless of whether intent checks pass or fail (in non-strict mode).
+The tool MUST report a **definition error** (and typically exit non-zero) if:
 
-Intent checks MUST NOT alter:
-- primitive ordering
-- transforms
-- tessellation
-- material assignment
-- skinning/export data
+* duplicate `checks[].id`
+* unknown `type`
+* referenced `primitive_id` does not exist
+* invalid `face` for the primitive type
+* invalid numeric bounds (NaN/Infinity, negative tolerances, min > max, etc.)
+* invalid enum values (axis, relation, point)
 
-## 9. Surface key usage
+These are configuration problems, not “failed checks.”
 
-`coplanar_faces` and `normal_alignment` may use `face` only where surface keys are defined.
+### 8.2 Check Failures (Diagnostic Results)
 
-For v0.12 scope:
-- `box`: `+x`, `-x`, `+y`, `-y`, `+z`, `-z`
-- `wedge`: `-z`, `-x`, `slope`, `-y`, `+y`
+A check failure means:
 
-## 10. Example for house roof/gable validation
+* the check was well-defined
+* the measured value was outside thresholds/ranges
 
-```yaml
-intent_checks:
-  default_tolerance: 0.02
-  checks:
-    - id: ridge_above_eave
-      type: point_order
-      a: { primitive_id: roof_front, point: max_y }
-      b: { primitive_id: front_wall_gap_0, point: max_y }
-      relation: gt
-      min_delta: 0.15
+Failures are reported in `checks[]` results and do not affect GLB output.
 
-    - id: roof_depth_reasonable
-      type: gap_axis
-      a: { primitive_id: roof_front }
-      b: { primitive_id: back_wall }
-      axis: z
-      min: -2.5
-      max: 2.5
+## 9. CLI / Tool Behavior
 
-    - id: front_gable_plane_touch
-      type: coplanar_faces
-      a: { primitive_id: gable_front_left, face: "+y" }
-      b: { primitive_id: gable_front_right, face: "-y" }
-      max_distance: 0.03
+Suggested CLI integration (names may vary):
+
+* `rigy inspect <file> --geometry-checks`
+
+  * evaluates embedded `geometry_checks` if present
+
+* `rigy inspect <file> --geometry-checks <checks.yaml>`
+
+  * evaluates an external checks file
+
+* `--fail-on-checks`
+
+  * if set, any check result with `status: fail` causes non-zero exit
+
+### Exit Codes (recommended)
+
+* `0` — inspection completed; all checks passed or checks not enabled
+* `1` — Rigy parse/validation failure
+* `2` — tooling/config error (including check definition errors)
+* `3` — checks enabled and at least one check failed with `--fail-on-checks`
+
+## 10. JSON Output
+
+When `rigy inspect --format json` is used, check results MUST appear in the top-level `checks` array:
+
+```json
+"checks": [
+  {
+    "id": "normal_ok",
+    "type": "normal_alignment",
+    "status": "fail",
+    "measured": { "angle_deg": 42.1 },
+    "expected": { "max_angle_deg": 30 }
+  }
+]
 ```
 
-## 11. Why this helps
+Ordering MUST be deterministic (same order as `geometry_checks.checks`).
 
-This catches common assembly mistakes early:
-- 90-degree roof orientation mismatch
-- inverted or misplaced gable faces
-- unexpected roof-wall gaps
+## 11. Determinism and Conformance
 
-without increasing primitive complexity.
+* `geometry_checks` MUST NOT affect:
+
+  * primitive ordering
+  * transforms
+  * tessellation
+  * materials
+  * skinning/export data
+* A conforming Rigy implementation’s GLB output MUST be byte-identical regardless of check pass/fail.
+* `geometry_checks` is a tooling feature and is not part of Rigy conformance requirements.

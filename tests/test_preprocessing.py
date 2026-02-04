@@ -434,6 +434,25 @@ class TestCombined:
         assert "params" in data  # original not mutated
 
 
+class TestToolingTopLevelBlocks:
+    def test_geometry_checks_ignored_by_preprocessing(self):
+        data = {
+            "version": "0.11",
+            "params": {"size": 2.0},
+            "value": "$size",
+            "geometry_checks": {
+                "checks": [
+                    {"id": "c1", "expr": "$size"},
+                    {"id": "c2", "expr": "${leftover}"},
+                ]
+            },
+        }
+        result = preprocess(data)
+        assert result["value"] == 2.0
+        assert result["geometry_checks"]["checks"][0]["expr"] == "$size"
+        assert result["geometry_checks"]["checks"][1]["expr"] == "${leftover}"
+
+
 class TestAabbExpansion:
     def test_basic_conversion(self):
         data = {
