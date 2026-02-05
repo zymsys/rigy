@@ -1,0 +1,45 @@
+# E-SIG-03: Rock with gouge (Non-Normative)
+#
+# A metaball_sphere@1 base shape with an sdf_capsule@1 subtraction
+# to carve an elongated gouge across the surface.
+
+version: "0.13"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+materials:
+  default:
+    base_color: [0.8, 0.8, 0.8, 1.0]
+
+meshes:
+  - id: rock_mesh
+    material: default
+    primitives:
+      - id: gouged_rock
+        type: implicit_surface
+        domain:
+          aabb:
+            min: [-0.5, -0.5, -0.5]
+            max: [0.5, 0.5, 0.5]
+          grid:
+            nx: 50
+            ny: 50
+            nz: 50
+        iso: 0.0
+        ops:
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.4
+            strength: 1.0
+          - op: subtract
+            field: sdf_capsule@1
+            radius: 0.08
+            height: 0.4
+            strength: 1.0
+            transform:
+              translation: [0.25, 0.0, 0.0]
+              rotation_degrees: [0, 0, 45]

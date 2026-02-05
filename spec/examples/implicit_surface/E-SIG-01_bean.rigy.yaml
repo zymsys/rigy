@@ -1,0 +1,45 @@
+# E-SIG-01: Bean shape (Non-Normative)
+#
+# Two overlapping metaball_sphere@1 operators forming an organic bean.
+# The iso threshold controls the degree of blending between the two spheres.
+
+version: "0.13"
+units: meters
+coordinate_system:
+  up: Y
+  forward: -Z
+  handedness: right
+tessellation_profile: v0_1_default
+
+materials:
+  default:
+    base_color: [0.8, 0.8, 0.8, 1.0]
+
+meshes:
+  - id: bean_mesh
+    material: default
+    primitives:
+      - id: bean
+        type: implicit_surface
+        domain:
+          aabb:
+            min: [-0.6, -0.3, -0.3]
+            max: [0.6, 0.3, 0.3]
+          grid:
+            nx: 60
+            ny: 30
+            nz: 30
+        iso: 0.2
+        ops:
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.3
+            strength: 1.0
+            transform:
+              translation: [-0.15, 0.0, 0.0]
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.3
+            strength: 1.0
+            transform:
+              translation: [0.15, 0.0, 0.0]

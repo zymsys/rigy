@@ -165,4 +165,22 @@ When combined with tags, the extras object contains both fields:
 
 ---
 
+## 13.9 Implicit Surface Export (v0.13)
+
+*Introduced in v0.13.*
+
+When exporting `implicit_surface` primitives to glTF 2.0:
+
+* **Variable vertex/index counts** — The vertex and index counts are determined by the marching cubes extraction algorithm applied to the scalar field. Unlike closed-form primitives, these counts are not fixed by the tessellation profile.
+
+* **Smooth normals** — Normals are computed from the scalar field gradient via central differences (see [Section 3.7](03-primitives.md#37-implicit-surface-primitive-normative)). Implementations MUST NOT derive normals from face geometry.
+
+* **No TEXCOORD_n** — Implicit surfaces do not generate UV coordinates. No `TEXCOORD_n` attributes are emitted for implicit surface primitives.
+
+* **Per-cell vertices** — Vertices are emitted per marching cubes cell without welding. Adjacent cells that share an edge produce duplicate vertices at the shared edge position.
+
+* **Empty surface** — If marching cubes extraction produces zero triangles (no grid cell crosses the iso threshold), the primitive emits zero-length attribute arrays (zero vertices, zero indices). This maintains the 1:1 mapping between Rigy primitives and glTF primitives required by v0.12+ (see Section 13.2).
+
+---
+
 **End of Chapter 13**

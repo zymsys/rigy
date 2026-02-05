@@ -36,7 +36,11 @@ class TestParseYaml:
 
     def test_unsupported_minor_version_error(self):
         with pytest.raises(ParseError, match="Unsupported version"):
-            parse_yaml('version: "0.13"\nunits: meters\n')
+            parse_yaml('version: "0.14"\nunits: meters\n')
+
+    def test_v013_accepted(self):
+        spec = parse_yaml('version: "0.13"\nunits: meters\n')
+        assert spec.version == "0.13"
 
     def test_v012_accepted(self):
         spec = parse_yaml('version: "0.12"\nunits: meters\n')

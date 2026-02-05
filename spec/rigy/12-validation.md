@@ -98,6 +98,15 @@ A conforming implementation MUST fail and MUST NOT emit output for any of the fo
 | V76 | `box_decompose.mesh` does not match containing mesh ID | ValidationError | v0.12 |
 | V77 | v0.12-only feature used under `version < "0.12"` | ValidationError | v0.12 |
 | V78 | Quaternion has length ≤ 1e-12 (zero-length / invalid) | ValidationError | v0.12 |
+| V79 | `implicit_surface` used with `version < "0.13"` | ValidationError | v0.13 |
+| V80 | Invalid AABB: `max[i] <= min[i]` or non-finite | ValidationError | v0.13 |
+| V81 | Invalid grid: `nx`, `ny`, or `nz` < 2 | ValidationError | v0.13 |
+| V82 | Empty `ops` list | ValidationError | v0.13 |
+| V83 | Unknown field type | ValidationError | v0.13 |
+| V84 | Invalid field parameters (non-positive radius/strength/height) | ValidationError | v0.13 |
+| V85 | Non-uniform scale on field operator transform | ValidationError | v0.13 |
+| V86 | Grid exceeds max cell count (`nx*ny*nz > 2,000,000`) | ValidationError | v0.13 |
+| V87 | Unknown extraction algorithm | ValidationError | v0.13 |
 | F114 | `box_decompose` generated ID collision | ValidationError | v0.11 |
 | F115 | `aabb` used with transform | ParseError | v0.11 |
 | F116 | Invalid cutout ID in `box_decompose` | ParseError | v0.11 |

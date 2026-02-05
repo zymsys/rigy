@@ -2,11 +2,11 @@
 
 ## 1.1 Goals
 
-Rigy v0.12 is a **cumulative specification** encompassing all features introduced from v0.1 through v0.12.
+Rigy v0.13 is a **cumulative specification** encompassing all features introduced from v0.1 through v0.13.
 
 ### Relationship to Prior Versions
 
-Rigy v0.12 is a **strict superset** of all prior versions. All features are retained:
+Rigy v0.13 is a **strict superset** of all prior versions. All features are retained:
 
 * **v0.1** — Geometric primitives, armatures, per-primitive skinning, symmetry
 * **v0.2** — Anchors, imports, instances, attach3, contracts (Ricy)
@@ -20,10 +20,11 @@ Rigy v0.12 is a **strict superset** of all prior versions. All features are reta
 * **v0.10** — Preprocessing stage: compile-time `params`, `repeat` macro, strict schema enforcement, duplicate YAML key detection
 * **v0.11** — AABB box syntax, `box_decompose` macro, semantic tags
 * **v0.12** — Numeric expressions, axis–angle rotations, per-primitive materials, `box_decompose.mesh` removal, AABB scope clarification
+* **v0.13** — Constrained implicit surfaces: metaball/SDF scalar fields, marching cubes extraction, deterministic organic geometry
 
 ### Roadmap Note
 
-Future work may include corrective shapes, pose-space deformation, constraints, control rigs, and additional macros. These are not part of v0.12.
+Future work may include corrective shapes, pose-space deformation, constraints, control rigs, implicit UV projection, and additional macros. These are not part of v0.13.
 
 ---
 
@@ -35,7 +36,7 @@ Rigy is a **compile target for geometry**, not a domain modeling language. Featu
 
 ### Specific Exclusions
 
-Rigy v0.12 explicitly does **not**:
+Rigy v0.13 explicitly does **not**:
 
 * Add blendshapes, corrective shapes, or pose-space deformation
 * Introduce IK systems, constraints, or control rigs
@@ -47,8 +48,9 @@ Rigy v0.12 explicitly does **not**:
 * Add per-primitive UV sets
 * Guarantee backward compatibility with incorrect outputs
 * Introduce conditionals or control flow (bounded compile-time expressions are added in v0.12)
-* Add geometry booleans / CSG
-* Add implicit modeling operations (e.g., "cut hole")
+* Add geometry booleans / CSG (constrained implicit surfaces are in scope; unbounded CSG is not)
+* Add unbounded implicit modeling (procedural noise, domain warping)
+* Add implicit UV projection
 * Introduce runtime variability
 
 ---
@@ -57,11 +59,23 @@ Rigy v0.12 explicitly does **not**:
 
 ### Parser Compatibility
 
-A v0.12 conforming parser:
+A v0.13 conforming parser:
 
-* MUST accept `version` values `"0.1"` through `"0.12"`
+* MUST accept `version` values `"0.1"` through `"0.13"`
 * MUST reject `version` with major version >= 1
-* SHOULD emit a warning for minor versions > 12 within major version 0
+* SHOULD emit a warning for minor versions > 13 within major version 0
+
+### From v0.12
+
+All valid v0.12 documents remain valid v0.13 files.
+
+v0.13 adds:
+
+* `implicit_surface` primitive with constrained scalar fields and marching cubes extraction
+* Field vocabulary: `metaball_sphere@1`, `metaball_capsule@1`, `sdf_sphere@1`, `sdf_capsule@1`
+* Frozen `marching_cubes@1` extraction algorithm with normative lookup tables
+* Symmetry expansion for implicit surfaces (operator merging, domain expansion)
+* Validation rules V79–V87
 
 ### From v0.11
 

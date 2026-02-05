@@ -1,7 +1,7 @@
-# Rigy Specification v0.12
+# Rigy Specification v0.13
 
 **Status:** Specification
-**Scope:** Cumulative specification covering all features from v0.1 through v0.12
+**Scope:** Cumulative specification covering all features from v0.1 through v0.13
 
 The key words MUST, MUST NOT, SHOULD, SHALL, and MAY in this document are to be
 interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
@@ -12,7 +12,7 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 
 1. [Introduction](01-introduction.md) — Goals, non-goals, migration guide
 2. [Fundamentals](02-fundamentals.md) — Determinism contract, coordinate system, units
-3. [Primitives](03-primitives.md) — Box, sphere, cylinder, capsule, wedge tessellation
+3. [Primitives](03-primitives.md) — Box, sphere, cylinder, capsule, wedge, implicit_surface tessellation
 4. [Surface Keys](04-surface-keys.md) — Canonical surface identifiers for primitives
 5. [Armatures and Skinning](05-armatures-skinning.md) — Bones, bindings, influence resolution
 6. [Weight Maps](06-weight-maps.md) — Gradients, overrides, external sources
@@ -21,9 +21,9 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 9. [UV System](09-uv-system.md) — UV roles, sets, generators
 10. [Preprocessing](10-preprocessing.md) — params, repeat, AABB, box_decompose, tags
 11. [Symmetry](11-symmetry.md) — Mirror-X expansion
-12. [Validation](12-validation.md) — Error model, V01-V78 table
+12. [Validation](12-validation.md) — Error model, V01-V87 table
 13. [glTF Export](13-gltf-export.md) — Serialization, buffer layout
-14. [Conformance](14-conformance.md) — Test suite, categories A-S
+14. [Conformance](14-conformance.md) — Test suite, categories A-T
 15. [Versioning](15-versioning.md) — Version format, trust model
 
 ### Appendices
@@ -51,6 +51,7 @@ interpreted as described in [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt).
 | Preprocessing (params, repeat) | v0.10 |
 | AABB box syntax, box_decompose, semantic tags | v0.11 |
 | Expressions, axis-angle rotations, per-primitive materials | v0.12 |
+| Implicit surfaces (metaball/SDF fields, marching cubes extraction) | v0.13 |
 
 ---
 
@@ -66,4 +67,4 @@ For a given Rigy input and specification version, a conforming implementation MU
 
 ---
 
-**End of Rigy Specification v0.12 Index**
+**End of Rigy Specification v0.13 Index**

@@ -1,4 +1,4 @@
-"""Pydantic v2 schema models for Rigy v0.1–v0.12 specs."""
+"""Pydantic v2 schema models for Rigy v0.1–v0.13 specs."""
 
 from __future__ import annotations
 
@@ -37,6 +37,15 @@ UV_GENERATOR_APPLICABILITY: dict[str, frozenset[str]] = {
     "cylindrical@1": frozenset({"cylinder"}),
     "capsule_cyl_latlong@1": frozenset({"capsule"}),
 }
+
+IMPLICIT_FIELD_VOCABULARY: frozenset[str] = frozenset(
+    {
+        "metaball_sphere@1",
+        "metaball_capsule@1",
+        "sdf_sphere@1",
+        "sdf_capsule@1",
+    }
+)
 
 
 class UvRoleEntry(BaseModel):
@@ -94,24 +103,85 @@ class Transform(BaseModel):
         return self
 
 
+class ImplicitAABB(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    min: tuple[float, float, float]
+    max: tuple[float, float, float]
+
+
+class ImplicitGrid(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nx: int
+    ny: int
+    nz: int
+
+
+class ImplicitDomain(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    aabb: ImplicitAABB
+    grid: ImplicitGrid
+
+
+class ImplicitExtraction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    algorithm: str = "marching_cubes@1"
+
+
+class FieldOperator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    op: Literal["add", "subtract"]
+    field: str
+    strength: float
+    radius: float
+    height: float | None = None
+    transform: Transform | None = None
+
+
 class Primitive(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["box", "sphere", "cylinder", "capsule", "wedge"]
+    type: Literal["box", "sphere", "cylinder", "capsule", "wedge", "implicit_surface"]
     id: str
     name: str | None = None
-    dimensions: dict[str, float]
+    dimensions: dict[str, float] | None = None
     transform: Transform | None = None
     material: str | None = None
     surface: str | None = None
     tags: list[str] | None = None
+    # implicit_surface fields (v0.13+)
+    domain: ImplicitDomain | None = None
+    iso: float | None = None
+    ops: list[FieldOperator] | None = None
+    extraction: ImplicitExtraction | None = None
 
-    @field_validator("dimensions")
-    @classmethod
-    def dimensions_not_empty(cls, v: dict[str, float]) -> dict[str, float]:
-        if not v:
-            raise ValueError("dimensions must not be empty")
-        return v
+    @model_validator(mode="after")
+    def _validate_by_type(self) -> Primitive:
+        if self.type == "implicit_surface":
+            if self.dimensions is not None:
+                raise ValueError("implicit_surface must not have 'dimensions'")
+            if self.domain is None:
+                raise ValueError("implicit_surface requires 'domain'")
+            if self.iso is None:
+                raise ValueError("implicit_surface requires 'iso'")
+            if self.ops is None or len(self.ops) == 0:
+                raise ValueError("implicit_surface requires non-empty 'ops'")
+        else:
+            if self.dimensions is None or len(self.dimensions) == 0:
+                raise ValueError("dimensions must not be empty")
+            if self.domain is not None:
+                raise ValueError(f"'{self.type}' must not have 'domain'")
+            if self.iso is not None:
+                raise ValueError(f"'{self.type}' must not have 'iso'")
+            if self.ops is not None:
+                raise ValueError(f"'{self.type}' must not have 'ops'")
+            if self.extraction is not None:
+                raise ValueError(f"'{self.type}' must not have 'extraction'")
+        return self
 
 
 class Material(BaseModel):

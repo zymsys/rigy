@@ -7,6 +7,7 @@ import re
 
 from rigy.errors import ValidationError
 from rigy.models import (
+    IMPLICIT_FIELD_VOCABULARY,
     UV_GENERATOR_APPLICABILITY,
     UV_GENERATOR_VOCABULARY,
     UV_ROLE_VOCABULARY,
@@ -37,7 +38,9 @@ def validate(spec: RigySpec, *, warning_policy: WarningPolicy | None = None) -> 
 
     _check_wedge_version_gate(spec)
     _check_tags_version_gate(spec)
+    _check_implicit_surface_version_gate(spec)
     _check_v012_version_gates(spec, version)
+    _check_implicit_surface_fields(spec)
     _check_material_base_color_length(spec)
     _check_material_base_color_range(spec)
     _check_material_refs(spec, version)
@@ -177,6 +180,8 @@ def _check_no_zero_length_bones(spec: RigySpec) -> None:
 def _check_primitive_dimensions_positive(spec: RigySpec) -> None:
     for mesh in spec.meshes:
         for prim in mesh.primitives:
+            if prim.dimensions is None:
+                continue
             for key, val in prim.dimensions.items():
                 if val <= 0:
                     raise ValidationError(
@@ -522,8 +527,9 @@ def _check_no_nan_infinity(spec: RigySpec) -> None:
 
     for mesh in spec.meshes:
         for prim in mesh.primitives:
-            for key, val in prim.dimensions.items():
-                _check_float(val, f"primitive {prim.id!r} dimension {key}")
+            if prim.dimensions is not None:
+                for key, val in prim.dimensions.items():
+                    _check_float(val, f"primitive {prim.id!r} dimension {key}")
             if prim.transform:
                 if prim.transform.translation:
                     _check_floats(prim.transform.translation, f"primitive {prim.id!r} translation")
@@ -781,3 +787,97 @@ def _warn_armature_root_not_at_origin(
                         f"place the armature root at (0, 0, 0).",
                         policy=warning_policy,
                     )
+
+
+def _check_implicit_surface_version_gate(spec: RigySpec) -> None:
+    """V79: Reject implicit_surface primitives in specs with version < 0.13."""
+    version = _spec_version(spec)
+    if version >= (0, 13):
+        return
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            if prim.type == "implicit_surface":
+                raise ValidationError(
+                    f"Primitive {prim.id!r} uses type 'implicit_surface' which requires "
+                    f"version >= 0.13, but spec declares version {spec.version!r}"
+                )
+
+
+def _check_implicit_surface_fields(spec: RigySpec) -> None:
+    """V80-V87: Validate implicit_surface primitive fields."""
+    for mesh in spec.meshes:
+        for prim in mesh.primitives:
+            if prim.type != "implicit_surface":
+                continue
+
+            # V80: AABB max > min and finite
+            aabb = prim.domain.aabb
+            for i, (lo, hi) in enumerate(zip(aabb.min, aabb.max)):
+                if not math.isfinite(lo) or not math.isfinite(hi):
+                    raise ValidationError(
+                        f"V80: Primitive {prim.id!r}: AABB component is not finite"
+                    )
+                if hi <= lo:
+                    raise ValidationError(
+                        f"V80: Primitive {prim.id!r}: AABB max[{i}]={hi} <= min[{i}]={lo}"
+                    )
+
+            # iso must be finite
+            if not math.isfinite(prim.iso):
+                raise ValidationError(f"Primitive {prim.id!r}: iso value {prim.iso} is not finite")
+
+            # V81: Grid dimensions >= 2
+            grid = prim.domain.grid
+            for name, val in [("nx", grid.nx), ("ny", grid.ny), ("nz", grid.nz)]:
+                if val < 2:
+                    raise ValidationError(
+                        f"V81: Primitive {prim.id!r}: grid {name}={val} must be >= 2"
+                    )
+
+            # V82: Non-empty ops (also checked by model validator, defense-in-depth)
+            if not prim.ops:
+                raise ValidationError(f"V82: Primitive {prim.id!r}: ops must not be empty")
+
+            # V86: Grid size limit
+            total = grid.nx * grid.ny * grid.nz
+            if total > 2_000_000:
+                raise ValidationError(
+                    f"V86: Primitive {prim.id!r}: grid size {total} exceeds limit of 2,000,000"
+                )
+
+            # V87: Extraction algorithm
+            if prim.extraction is not None and prim.extraction.algorithm != "marching_cubes@1":
+                raise ValidationError(
+                    f"V87: Primitive {prim.id!r}: unknown extraction algorithm "
+                    f"{prim.extraction.algorithm!r}"
+                )
+
+            # Per-operator checks
+            for op in prim.ops:
+                # V83: Field vocabulary
+                if op.field not in IMPLICIT_FIELD_VOCABULARY:
+                    raise ValidationError(
+                        f"V83: Primitive {prim.id!r}: unknown field type {op.field!r}"
+                    )
+
+                # V84: Non-positive parameters
+                if op.radius <= 0:
+                    raise ValidationError(
+                        f"V84: Primitive {prim.id!r}: operator radius={op.radius} must be > 0"
+                    )
+                if op.strength <= 0:
+                    raise ValidationError(
+                        f"V84: Primitive {prim.id!r}: operator strength={op.strength} must be > 0"
+                    )
+
+                # Capsule fields require height
+                if op.field in ("metaball_capsule@1", "sdf_capsule@1"):
+                    if op.height is None:
+                        raise ValidationError(
+                            f"V84: Primitive {prim.id!r}: capsule field {op.field!r} "
+                            f"requires 'height'"
+                        )
+                    if op.height <= 0:
+                        raise ValidationError(
+                            f"V84: Primitive {prim.id!r}: operator height={op.height} must be > 0"
+                        )

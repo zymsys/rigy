@@ -8,7 +8,7 @@ The Rigy specification includes a **normative conformance suite**, consisting of
 * Canonical output artifacts (`.glb`)
 * A manifest describing expected results
 
-An implementation is **Rigy v0.12 conformant** if and only if it produces byte-identical outputs for all positive conformance tests and rejects all negative conformance tests with the correct error category.
+An implementation is **Rigy v0.13 conformant** if and only if it produces byte-identical outputs for all positive conformance tests and rejects all negative conformance tests with the correct error category.
 
 ---
 
@@ -31,7 +31,7 @@ An implementation is **Rigy v0.12 conformant** if and only if it produces byte-i
 
 ```json
 {
-  "version": "0.12",
+  "version": "0.13",
   "suite_revision": 1,
   "tests": [
     {
@@ -60,7 +60,7 @@ An implementation is **Rigy v0.12 conformant** if and only if it produces byte-i
 * `version` — Spec version this suite targets
 * `suite_revision` — Integer, incremented when conformance outputs are corrected within the same spec version
 * `tests[].id` — Unique test identifier
-* `tests[].category` — Letter category (A through R, see below)
+* `tests[].category` — Letter category (A through T, see below)
 * `tests[].type` — `"positive"` (must produce output) or `"negative"` (must reject)
 * `tests[].input` — Path to input YAML, relative to conformance root
 * `tests[].expected_output` — Path to canonical GLB (positive tests only)
@@ -101,7 +101,7 @@ An implementation is **Rigy v0.12 conformant** if and only if it produces byte-i
 
 ### F. Validation Failure Cases
 
-* Each hard error (V01-V78, F114-F116) SHOULD have at least one negative test
+* Each hard error (V01-V87, F114-F116) SHOULD have at least one negative test
 * Verifies the correct error type is raised and no output is produced
 
 ### G. Symmetry Expansion
@@ -195,6 +195,17 @@ An implementation is **Rigy v0.12 conformant** if and only if it produces byte-i
 * Per-primitive glTF emission with `rigy_id` extras
 * Negative: expression errors (V68–V71), rotation errors (V67, V72, V73, V78), material resolution errors (V74, V75), box_decompose mesh mismatch (V76), version gating (V77)
 
+### T. Implicit Surfaces
+
+* Single metaball sphere
+* Bean (two overlapping metaballs)
+* Capsule + sphere union
+* Rock with chip (subtract `sdf_sphere@1`)
+* Gouge scrape (subtract `sdf_capsule@1`)
+* Verifies deterministic marching cubes extraction (vertex/index counts, positions, normals)
+* Verifies empty surface case (zero vertices/indices)
+* Negative tests for V79–V87
+
 All categories MUST include both **positive** and **negative** cases where applicable.
 
 ---
@@ -256,6 +267,30 @@ All conformance comparisons MUST be byte-exact.
 * **V76_mesh_mismatch** — `box_decompose.mesh` mismatches containing mesh
 * **V77_version_gating** — v0.12 feature used in v0.11 document
 * **V78_zero_quaternion** — Zero-length quaternion
+
+---
+
+## 14.8 v0.13 Conformance Additions
+
+### Positive Fixtures
+
+* **T01_single_metaball** — Single `metaball_sphere@1` operator, basic marching cubes extraction
+* **T02_bean** — Two overlapping `metaball_sphere@1` operators forming a bean shape
+* **T03_capsule_sphere_union** — `metaball_capsule@1` + `metaball_sphere@1` union
+* **T04_rock_chip** — `metaball_sphere@1` with `sdf_sphere@1` subtract for a chipped rock
+* **T05_rock_gouge** — `metaball_sphere@1` with `sdf_capsule@1` subtract for an elongated gouge
+
+### Negative Fixtures
+
+* **V79_version_gating** — `implicit_surface` used in v0.12 document
+* **V80_invalid_aabb** — AABB with `max[i] <= min[i]`
+* **V81_invalid_grid** — Grid dimension < 2
+* **V82_empty_ops** — Empty `ops` list
+* **V83_unknown_field** — Unknown field type identifier
+* **V84_invalid_field_params** — Non-positive radius
+* **V85_non_uniform_scale** — Non-uniform scale on field operator transform
+* **V86_grid_too_large** — Grid exceeds 2,000,000 cells
+* **V87_unknown_extraction** — Unknown extraction algorithm
 
 ---
 

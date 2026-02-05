@@ -127,6 +127,8 @@ A conforming Rigy v0.8+ implementation MUST reject any generator identifier not 
 
 A UV set generator MUST be valid for **every primitive type present in the mesh** (V52).
 
+**Note (v0.13):** The `implicit_surface` primitive supports **no UV generator**. No generator in the v0.8 vocabulary is applicable to `implicit_surface`. Meshes containing an `implicit_surface` primitive MUST NOT declare `uv_sets` (caught by V52).
+
 ### Generator Evaluation Order (Normative)
 
 UV generation occurs:

@@ -417,6 +417,18 @@ Each child is placed by snapping its **mount** frame (three anchors on the child
 
 **Validation (V67–V78)** — Twelve new validation codes covering expression errors (V68–V71), rotation errors (V67, V72, V73, V78), material resolution (V74, V75), box_decompose mesh mismatch (V76), and version gating (V77).
 
+### v0.13 — Constrained implicit surfaces
+
+**`implicit_surface` primitive** — A new primitive type that defines geometry as an isosurface of a scalar field, sampled on a finite grid and extracted via marching cubes. Enables organic forms (beans, rocks, creature base shapes) and localized sculpting edits (chips, gouges) while preserving Rigy's byte-identical determinism contract.
+
+**Field vocabulary** — Four bounded, compactly-supported field functions: `metaball_sphere@1`, `metaball_capsule@1` (smooth organic unions), `sdf_sphere@1`, `sdf_capsule@1` (localized carving/subtraction). Fields are combined via linear superposition with `add`/`subtract` polarity.
+
+**Frozen extraction** — `marching_cubes@1` is a frozen algorithm identifier with normative lookup tables (SHA-256 verified), traversal order, edge interpolation, and winding conventions. Future algorithms use new identifiers.
+
+**Symmetry interaction** — Mirrored operators are merged into the same implicit surface (not duplicated as separate primitives), with automatic domain expansion. Surface extraction occurs once, after symmetry expansion.
+
+**Validation (V79–V87)** — Version gating, AABB validity, grid constraints, field vocabulary, field parameter validation, uniform-scale enforcement, grid size limit, and extraction algorithm validation.
+
 ### Rigs v0.1 — Scene composition
 
 A separate `.rigs.yaml` format that composes multiple Rigy assets into a single glTF scene. Deterministic, no scripting, no arbitrary transforms.
@@ -445,7 +457,7 @@ Aligned with glTF 2.0: **Y-up**, **-Z forward**, **right-handed**. All units in 
 
 ## Spec
 
-The canonical Rigy spec is the cumulative v0.12 document set at [`spec/rigy/index.md`](spec/rigy/index.md), with chapter files under `spec/rigy/` (including preprocessing, validation, conformance, and versioning).
+The canonical Rigy spec is the cumulative v0.13 document set at [`spec/rigy/index.md`](spec/rigy/index.md), with chapter files under `spec/rigy/` (including preprocessing, validation, conformance, and versioning).
 
 For Rigs scene composition, see [`spec/rigs/index.md`](spec/rigs/index.md).
 

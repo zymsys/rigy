@@ -60,4 +60,56 @@ During symmetry expansion:
 
 ---
 
+## 11.6 Implicit Surfaces and Symmetry
+
+*Introduced in v0.13.*
+
+During symmetry expansion of `implicit_surface` primitives:
+
+### Operator Merging
+
+* Symmetry expansion operates on the **field operator list**
+* Mirrored operators are **merged into the same implicit surface** (not duplicated as a separate primitive)
+* Surface extraction occurs **once**, after expansion
+
+This ensures implicit blending across the symmetry plane.
+
+### Domain Expansion Rule (Normative)
+
+After symmetry expansion merges mirrored operators into the same implicit surface, the compiler MUST expand the sampling domain AABB to enclose the full region influenced by the expanded operator set.
+
+For a symmetry mirror about the YZ plane (X mirror):
+
+Let original AABB be:
+
+* `min = (x0, y0, z0)`
+* `max = (x1, y1, z1)`
+
+Define mirrored AABB:
+
+* `min' = (-x1, y0, z0)`
+* `max' = (-x0, y1, z1)`
+
+Expanded AABB is the union:
+
+* `min_exp = (min(x0, -x1), y0, z0)`
+* `max_exp = (max(x1, -x0), y1, z1)`
+
+The compiler MUST use the expanded AABB for grid sampling and extraction.
+
+Grid resolution (`nx`, `ny`, `nz`) remains unchanged. The world-space grid step size MAY change as a result of domain expansion.
+
+### Operator Transform Mirroring
+
+For each mirrored operator:
+
+* X component of translation is negated
+* Rotation is mirrored about the YZ plane (consistent with existing symmetry rules)
+
+### Material and Tag Interaction
+
+Material references and tags on implicit surface primitives follow the same rules as other primitives (see Sections 11.2 and 11.5).
+
+---
+
 **End of Chapter 11**

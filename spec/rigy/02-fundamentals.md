@@ -72,6 +72,16 @@ All rotation authoring forms (Section 10.9) are canonicalized to `rotation_quat`
 * `-0.0` MUST be canonicalized to `0.0`.
 * The sign convention `w >= 0` MUST be enforced (negate all components if `w < 0`).
 
+### Implicit Surface Determinism
+
+Implicit surface evaluation in v0.13+:
+
+* All field evaluation MUST use IEEE 754 float64 precision.
+* Grid traversal order, corner ordering, edge interpolation, and lookup tables are normative (see [Section 3.7](03-primitives.md#37-implicit-surface-primitive-normative)).
+* Marching cubes lookup tables are frozen binary constants with a normative SHA-256 hash.
+* Vertex emission is per-cell without welding; indices are sequential per triangle.
+* The resulting geometry is **lossy but deterministic**: the finite grid introduces quantization loss relative to the mathematical field definition, but all evaluation, traversal, and emission rules are fully specified. The same input MUST produce byte-identical output.
+
 ### Scope of Determinism
 
 * Determinism applies **only to correct behavior as defined by the spec**
@@ -120,15 +130,17 @@ The following are **permanently out of scope**:
 | Furniture helpers | `drawer_stack`, `shelf_unit` | Domain-specific |
 | Character helpers | `finger_splay`, `face_rig` | Domain-specific |
 | Procedural generators | `tree`, `terrain`, `scatter` | Require randomness |
-| Implicit modeling | `fillet`, `chamfer`, `boolean` | Break determinism |
+| Unbounded implicit modeling | `fillet`, `chamfer`, `boolean`, unbounded SDF, procedural noise | Break determinism |
 | Semantic shortcuts | `door`, `window`, `hinge` | Encode domain meaning |
+
+**Clarification:** Rigy v0.13 includes **constrained implicit surfaces** (`implicit_surface` primitive) with bounded fields, finite grids, and deterministic extraction. This is distinct from unbounded CSG, procedural noise, and general-purpose implicit modeling, which remain out of scope.
 
 ### Recommended Pattern
 
 Domain tools SHOULD:
 
 1. Implement domain features internally
-2. Expand them to Rigy primitives (box, sphere, cylinder, capsule, wedge)
+2. Expand them to Rigy primitives (box, sphere, cylinder, capsule, wedge, implicit_surface)
 3. Emit standard Rigy YAML
 4. Use `tags` (v0.11) to preserve semantic intent
 

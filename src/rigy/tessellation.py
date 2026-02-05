@@ -25,6 +25,13 @@ def tessellate_primitive(primitive: Primitive, profile: str = "v0_1_default") ->
     if profile != "v0_1_default":
         raise TessellationError(f"Unknown tessellation profile: {profile!r}")
 
+    if primitive.type == "implicit_surface":
+        from rigy.implicit import tessellate_implicit_surface
+
+        mesh_data = tessellate_implicit_surface(primitive)
+        mesh_data = _apply_transform(mesh_data, primitive)
+        return mesh_data
+
     generators = {
         "box": _tessellate_box,
         "sphere": _tessellate_sphere,
