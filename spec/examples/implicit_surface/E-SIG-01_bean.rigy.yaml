@@ -1,7 +1,8 @@
 # E-SIG-01: Bean shape (Non-Normative)
 #
-# Two overlapping metaball_sphere@1 operators forming an organic bean.
-# The iso threshold controls the degree of blending between the two spheres.
+# Five metaball_sphere@1 operators placed along a curved arc form a kidney-
+# bean silhouette.  A sixth subtract operator carves the hilum (concavity).
+# The arc bows upward (+Y = convex back); the open side faces downward.
 
 version: "0.13"
 units: meters
@@ -23,23 +24,47 @@ meshes:
         type: implicit_surface
         domain:
           aabb:
-            min: [-0.6, -0.3, -0.3]
-            max: [0.6, 0.3, 0.3]
+            min: [-0.28, -0.25, -0.20]
+            max: [0.28, 0.30, 0.20]
           grid:
-            nx: 60
-            ny: 30
-            nz: 30
-        iso: 0.2
+            nx: 50
+            ny: 46
+            nz: 34
+        iso: 0.20
         ops:
           - op: add
             field: metaball_sphere@1
-            radius: 0.3
+            radius: 0.21
             strength: 1.0
             transform:
-              translation: [-0.15, 0.0, 0.0]
+              translation: [-0.11, -0.04, 0.0]
           - op: add
             field: metaball_sphere@1
-            radius: 0.3
+            radius: 0.18
             strength: 1.0
             transform:
-              translation: [0.15, 0.0, 0.0]
+              translation: [-0.05, 0.02, 0.0]
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.18
+            strength: 1.0
+            transform:
+              translation: [0.01, 0.025, 0.0]
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.16
+            strength: 1.0
+            transform:
+              translation: [0.07, 0.02, 0.0]
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.15
+            strength: 1.0
+            transform:
+              translation: [0.11, -0.05, 0.0]
+          - op: subtract
+            field: metaball_sphere@1
+            radius: 0.10
+            strength: 0.35
+            transform:
+              translation: [0.0, -0.10, 0.0]
