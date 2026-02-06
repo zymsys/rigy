@@ -1,7 +1,7 @@
 # E-SIG-02: Rock with chip (Non-Normative)
 #
-# A metaball_sphere@1 base shape with an sdf_sphere@1 subtraction
-# to carve a chip out of the surface.
+# An oblate river-rock built from overlapping metaball_sphere@1 sources,
+# with an sdf_sphere@1 subtraction to carve a chip out of the surface.
 
 version: "0.13"
 units: meters
@@ -23,21 +23,53 @@ meshes:
         type: implicit_surface
         domain:
           aabb:
-            min: [-0.5, -0.5, -0.5]
-            max: [0.5, 0.5, 0.5]
+            min: [-0.35, -0.18, -0.30]
+            max: [0.35, 0.18, 0.30]
           grid:
-            nx: 50
-            ny: 50
-            nz: 50
-        iso: 0.0
+            nx: 80
+            ny: 40
+            nz: 70
+        iso: 0.25
         ops:
+          # Core body — large center sphere
           - op: add
             field: metaball_sphere@1
-            radius: 0.4
+            radius: 0.22
             strength: 1.0
-          - op: subtract
-            field: sdf_sphere@1
+            transform:
+              translation: [0.0, 0.0, 0.0]
+          # Left lobe — slightly lower
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.18
+            strength: 1.0
+            transform:
+              translation: [-0.10, -0.01, 0.0]
+          # Right lobe — slightly higher, smaller
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.16
+            strength: 1.0
+            transform:
+              translation: [0.12, 0.01, 0.0]
+          # Front bulge
+          - op: add
+            field: metaball_sphere@1
             radius: 0.15
             strength: 1.0
             transform:
-              translation: [0.3, 0.2, 0.0]
+              translation: [0.02, 0.0, -0.08]
+          # Back bulge — offset for asymmetry
+          - op: add
+            field: metaball_sphere@1
+            radius: 0.16
+            strength: 1.0
+            transform:
+              translation: [-0.04, 0.01, 0.09]
+          # Chip — SDF subtract facing the default 3/4 camera
+          - op: subtract
+            field: sdf_sphere@1
+            radius: 0.07
+            strength: 1.0
+            transform:
+              translation: [0.15, 0.06, -0.10]
